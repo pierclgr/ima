@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/logo.png" alt="IMA logo" width="200">
+  <img src="assets/logo.png" alt="IMA" width="200">
 </p>
 
-<h3 align="center">IMA</h3>
+<h2 align="center">IMA: Instant Multimodal Answers</h2>
 
-<p align="center"><em>Instant Multimodal Answers</em></p>
+<p align="center"><em>A decoder-based image-text System One model</em></p>
 
 <p align="center">
   <a href="https://www.repostatus.org/#active"><img
