@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="IMA" width="200">
+  <img src="assets/logo.png" alt="IMA" width="150">
 </p>
 
 <h2 align="center">IMA: Instant Multimodal Answers</h2>
