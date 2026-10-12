@@ -1,8 +1,17 @@
 <p align="center">
-  <img src="assets/logo.png" alt="IMA logo" width="250">
+  <img src="assets/logo.png" alt="IMA logo" width="200">
 </p>
 
-# IMA: Instant Multimodal Answers
+<h3 align="center">IMA</h3>
+
+<p align="center"><em>Instant Multimodal Answers</em></p>
+
+<p align="center">
+  <a href="https://www.repostatus.org/#active"><img
+    src="https://flat.badgen.net/badge/repo%20status/Active/green"
+    alt="Project Status: Active – The project has reached a stable, usable
+    state and is being actively developed."></a>
+</p>
 
 A fast decision model built on a pretrained multimodal LLM (Hugging Face).
 It answers typed questions about a state (text and images) in one forward
