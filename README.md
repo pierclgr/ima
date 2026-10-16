@@ -133,8 +133,8 @@ The student is the config's `backbone`, `runs/qwen3_5_0_8b/final`. Both can
 also be raw HF backbones (e.g. `Qwen/Qwen3.5-0.8B`), as in training; a raw
 teacher has temperature 1 (no calibration). Fine-tuned model directories must
 include their processors. Generation saves only soft labels and metadata
-under `runs/qwen3_8_27b/soft_labels`; images stay in the original HF dataset.
-The `distillation` section sets `teacher`, `soft_labels` (the cache
+under `datasets/qwen3_8_27b/soft_labels`; images stay in the original HF
+dataset. The `distillation` section sets `teacher`, `soft_labels` (the cache
 directory), `alpha`, `temperature` and `generating` (the teacher's prediction
 arguments). The distillation config for the cache task has only `data` and
 `distillation`. Valid soft labels are reused without loading the teacher.
@@ -169,7 +169,8 @@ modal run --detach src/modal/app.py --task train \
     --config configs/train/qwen3_5_0_8b_distilled.yml
 ```
 
-Place both fine-tuned models on that cloud's persistent `runs` volume.
+Place both fine-tuned models on that cloud's persistent `runs` volume. The
+soft labels are saved on its `datasets` volume.
 Regular model/dataset caching uses CPU; caching teacher soft labels uses GPU.
 Both use the same Modal cache function with different resource options.
 If `train` must build soft labels, its GPU must fit the teacher too. Pre-cache

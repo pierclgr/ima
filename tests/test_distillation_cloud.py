@@ -11,6 +11,9 @@ def test_runpod_has_no_distill_task_and_train_serves_tensorboard() -> None:
     command = start_command("train", ["config.yml"], "abc123")
     assert "python -m src.training.train config.yml" in command
     assert "tensorboard --logdir" in command
+    # soft labels live under `datasets/`, so both volumes are linked
+    assert "ln -s /workspace/runs runs" in command
+    assert "ln -s /workspace/datasets datasets" in command
 
 
 @pytest.mark.parametrize("distillation", [False, True])

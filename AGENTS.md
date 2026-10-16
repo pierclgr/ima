@@ -125,7 +125,8 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
   RunPod secret `huggingface`); GPU from the config's `runpod.gpu` (default
   `NVIDIA H200`); runs the pushed local `HEAD`
 - Both cloud launchers accept `cache` with a distillation config (needs
-  GPU; regular caching uses CPU). Outputs stay on the runs volume.
+  GPU; regular caching uses CPU). Outputs stay on the runs volume; soft
+  labels go on the datasets volume (`datasets/...` paths).
 
 ## Distillation
 - Teacher and student: fine-tuned System One models or raw backbones

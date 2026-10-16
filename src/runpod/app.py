@@ -4,7 +4,9 @@ Creates one pod per task. The pod clones this repository at a commit, runs
 the task and then deletes itself. Its network volume, mounted at
 `/workspace`, keeps big data between pods:
 - `models`: HF Hub cache (backbones)
-- `datasets`: HF datasets cache (raw files and prepared splits)
+- `datasets`: HF datasets cache (raw files and prepared splits) and the
+  distillation soft labels, linked as the repository's `datasets`, so the
+  configs' `datasets/...` paths land on it
 - `runs`: run outputs (checkpoints, `final/`, test metrics, task logs in
   `runs/logs/<pod_id>.log`), linked as the repository's `runs`, so the
   configs' `runs/...` paths land on it
@@ -140,6 +142,7 @@ def start_command(task: str, argv: list[str], ref: str) -> str:
         f"cd {CODE}",
         f"git checkout {shlex.quote(ref)}",
         f"ln -s {VOLUME}/runs runs",
+        f"ln -s {VOLUME}/datasets datasets",
         "uv sync",
     ]
     if task == "train":

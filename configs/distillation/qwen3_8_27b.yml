@@ -6,9 +6,9 @@ data:
 
 distillation:
   teacher: runs/qwen3_8_27b/final
-  soft_labels: runs/qwen3_8_27b/soft_labels
+  soft_labels: datasets/qwen3_8_27b/soft_labels
   generating:
-    per_device_eval_batch_size: 4
+    per_device_eval_batch_size: 32
     dataloader_num_workers: 16
     bf16: true
 

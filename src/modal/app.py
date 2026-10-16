@@ -5,8 +5,9 @@ this app create no web endpoint and can run in parallel.
 
 Persistent Volumes (created on first use), so big data is downloaded once:
 - `models`: HF Hub cache (backbones), mounted at `/root/models`
-- `datasets`: HF datasets cache (raw files and prepared splits), mounted at
-  `/root/datasets`
+- `datasets`: HF datasets cache (raw files and prepared splits) and the
+  distillation soft labels, mounted at `/root/datasets`, so the configs'
+  `datasets/...` paths land on it
 - `runs`: run outputs (checkpoints, `final/`, test metrics), mounted at
   `/root/runs`, so the configs' `runs/...` paths land on it
 
