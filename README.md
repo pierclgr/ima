@@ -1,8 +1,17 @@
 <p align="center">
-  <img src="assets/logo.png" alt="IMA logo" width="250">
+  <img src="assets/logo.png" alt="IMA" width="150">
 </p>
 
-# IMA: Instant Multimodal Answers
+<h2 align="center">IMA: Instant Multimodal Answers</h2>
+
+<p align="center"><em>A decoder-based image-text System One model</em></p>
+
+<p align="center">
+  <a href="https://www.repostatus.org/#active"><img
+    src="https://flat.badgen.net/badge/repo%20status/Active/green"
+    alt="Project Status: Active – The project has reached a stable, usable
+    state and is being actively developed."></a>
+</p>
 
 A fast decision model built on a pretrained multimodal LLM (Hugging Face).
 It answers typed questions about a state (text and images) in one forward
