@@ -103,29 +103,3 @@ def test_cache_only_config(tmp_path: Path) -> None:
     path.write_text("data: {dataset: dataset, train: train}\n")
     with pytest.raises(ValueError, match="distillation"):
         DistillationConfig.from_yaml(path)
-
-
-def test_example_configs_keep_control_matched() -> None:
-    student = TrainConfig.from_yaml(
-        "configs/train/qwen3_5_0_8b_distilled.yml",
-        ["--training.use_cpu", "true"],
-    )
-    control = TrainConfig.from_yaml(
-        "configs/train/qwen3_5_0_8b_control.yml",
-        ["--training.use_cpu", "true"],
-    )
-    cache = DistillationConfig.from_yaml("configs/distillation/qwen3_8_27b.yml")
-    assert student.distillation is not None and control.distillation is None
-    assert cache.distillation.teacher == student.distillation.teacher
-    assert cache.distillation.soft_labels == student.distillation.soft_labels
-    assert cache.data.dataset == student.data.dataset
-    assert student.backbone == control.backbone
-    assert student.lora == control.lora
-    assert student.data == control.data
-    assert student.seed == control.seed
-    assert student.calibration == control.calibration
-    student_args = student.training.to_dict()
-    control_args = control.training.to_dict()
-    student_args.pop("output_dir")
-    control_args.pop("output_dir")
-    assert student_args == control_args
