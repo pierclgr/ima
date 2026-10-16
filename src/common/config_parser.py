@@ -27,7 +27,8 @@ class ConfigParser:
         Args:
             path: The YAML file.
             overrides: `--key value` pairs: `--<key>` for a top-level key or
-                `--<section>.<key>` for a section key.
+                `--<section>.<key>` for a section key (more dots for nested
+                keys, e.g. `--training.distillation.alpha`).
             keys: Allowed top-level keys for overrides.
             sections: Allowed sections for overrides.
 
@@ -52,7 +53,12 @@ class ConfigParser:
                 values[section] = value
             elif key and section in sections:
                 values[section] = values.get(section) or {}
-                values[section][key] = value
+                node = values[section]
+                *parents, last = key.split(".")
+                for parent in parents:
+                    node[parent] = node.get(parent) or {}
+                    node = node[parent]
+                node[last] = value
             else:
                 raise ValueError(f"unknown override {flag!r}")
         return values

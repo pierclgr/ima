@@ -1,0 +1,19 @@
+# builds the teacher soft labels only (uv run python -m src.modal.cache)
+data:
+  dataset: Jacqkues/kev-vision-decisions-full
+  train: train
+  validation: validation
+
+distillation:
+  teacher: runs/qwen3_8_27b/final
+  soft_labels: runs/qwen3_8_27b/soft_labels
+  generating:
+    per_device_eval_batch_size: 4
+    dataloader_num_workers: 16
+    bf16: true
+
+modal:
+  gpu: H200
+
+runpod:
+  gpu: NVIDIA H200

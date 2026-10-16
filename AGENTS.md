@@ -52,7 +52,8 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
       Two errors)
   - `training/`: LoRA training
     - `config.py`: `TrainConfig` (YAML run config: `backbone`, `seed`,
-      `lora`, `data`, `training`, optional `calibration`)
+      `lora`, `data`, `training`, optional `calibration` and
+      `distillation`)
     - `train.py`: training script (`Trainer`, LoRA on the language model;
       calibrates at the end if configured)
   - `calibration/`: temperature calibration (after training or standalone)
@@ -61,6 +62,13 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
       `calibration`, `calibrating`)
     - `calibrate.py`: `TemperatureCalibrator` (global temperature) and
       the standalone calibration script
+  - `distillation/`: offline System One teacher-to-student distillation
+    - `config.py`: `DistillationSettings` (teacher, `soft_labels`, loss;
+      the `distillation` section of a train config) and `DistillationConfig`
+      (cache-only config)
+    - `cache.py`: atomic target export and checked record alignment
+    - `generate.py`: builds missing targets or checks/reuses existing targets
+    - `trainer.py`: teacher collator, masked CE/KL loss, human-only eval
   - `testing/`: standalone testing of a trained model
     - `config.py`: `TestConfig` (YAML: `model`, optional `temperature`,
       `data`, `testing`)
@@ -72,7 +80,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
       (GPUs, Volumes `models`, `datasets`, `runs` as persistent caches)
     - `tensorboard_app.py`: separate Modal app serving TensorBoard (web
       app on the `runs` Volume), so runs of `app.py` can go in parallel
-    - `cache.py`: downloads a config's backbone and dataset (cache)
+    - `cache.py`: downloads model/data or builds a distillation target cache
   - `runpod/`: RunPod cloud runs
     - `app.py`: launcher, one pod per task (`cache`, `train`, `calibrate`,
       `test`); the pod clones the repo at a commit, runs the task (and
@@ -82,6 +90,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - `configs/train/`: training run configs (YAML)
 - `configs/calibration/`: standalone calibration configs (YAML)
 - `configs/test/`: test run configs (YAML)
+- `configs/distillation/`: soft label caching configs (`data`, `distillation`)
 - `docs/`: documentation
 - `assets/`: images (e.g. the results graph used by `README.md`)
 - `README.md`: project overview (install, usage, configs, results)
@@ -100,6 +109,9 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
   metrics
 - `uv run python -m src.modal.cache configs/train/<run>.yml`: download
   the backbone and dataset of a config
+- `uv run python -m src.modal.cache
+  configs/distillation/<run>.yml [--section.key value]`: cache teacher
+  soft labels (a train config with a `distillation` section distills offline)
 - `modal run [--detach] src/modal/app.py --task cache|train|calibrate|test
   --config <config.yml> [--overrides "..."] [--gpu X]`:
   same tasks on Modal (needs `modal setup` and Secret `huggingface` with
@@ -112,6 +124,22 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
   same tasks on RunPod (needs `RUNPOD_API_KEY`, `RUNPOD_VOLUME_ID` and a
   RunPod secret `huggingface`); GPU from the config's `runpod.gpu` (default
   `NVIDIA H200`); runs the pushed local `HEAD`
+- Both cloud launchers accept `cache` with a distillation config (needs
+  GPU; regular caching uses CPU). Outputs stay on the runs volume.
+
+## Distillation
+- Teacher and student: fine-tuned System One models or raw backbones
+- Teacher probabilities already include its saved calibration temperature
+  (1 for a raw backbone)
+- Cache and train (with `distillation`) both build missing soft labels and
+  reuse valid ones
+- Use one Modal cache function with CPU/GPU invocation resource options
+- Release the teacher before loading the student for training
+- Human targets remain separate from teacher targets; shuffle both together
+- Attach teacher targets before splitting whole calibration records
+- Validation and calibration use only human supervision
+- Resume a student adapter over the same original fine-tuned backbone
+- See `docs/DISTILLATION.md` for the implementation and experiment protocol
 
 ## Conventions
 - Python: PEP8, Google docstrings, type hints everywhere (PEP 484)

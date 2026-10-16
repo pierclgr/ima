@@ -102,6 +102,79 @@ uv run python -m src.training.train configs/train/qwen3_5_0_8b.yml --training.le
   loss and seconds per question. System Two also reports the share of
   outputs with no valid answer.
 
+### Offline distillation
+Distill the calibrated fine-tuned Qwen3.8-27B into the fine-tuned
+Qwen3.5-0.8B. It is a normal training run with a `distillation` section in
+the config; training builds missing teacher soft labels automatically.
+You can also build them first with the cache task and a distillation config:
+
+```bash
+# optional: cache the teacher option probabilities (soft labels)
+uv run python -m src.modal.cache configs/distillation/qwen3_8_27b.yml
+
+# build missing soft labels, then train a new LoRA on the fine-tuned student
+uv run python -m src.training.train configs/train/qwen3_5_0_8b_distilled.yml
+
+# control: the same student and extra epoch, using human targets only
+uv run python -m src.training.train configs/train/qwen3_5_0_8b_control.yml
+```
+
+The teacher reads `runs/qwen3_8_27b/final` and uses its saved calibration.
+The student is the config's `backbone`, `runs/qwen3_5_0_8b/final`. Both can
+also be raw HF backbones (e.g. `Qwen/Qwen3.5-0.8B`), as in training; a raw
+teacher has temperature 1 (no calibration). Fine-tuned model directories must
+include their processors. Generation saves only soft labels and metadata
+under `runs/qwen3_8_27b/soft_labels`; images stay in the original HF dataset.
+The `distillation` section sets `teacher`, `soft_labels` (the cache
+directory), `alpha`, `temperature` and `generating` (the teacher's prediction
+arguments). The distillation config for the cache task has only `data` and
+`distillation`. Valid soft labels are reused without loading the teacher.
+Loading checks dataset fingerprints, split expressions, question identities,
+and option order. Use a new directory when the teacher or source data
+changes. Failed exports do not publish a partial cache and can be retried.
+
+The loss is `alpha * CE(human) + (1 - alpha) * T^2 * KL(teacher || student)`.
+Defaults are `distillation.alpha: 0.25` and `distillation.temperature: 1.0`.
+`T` is extra softening after teacher calibration. Human soft targets, such
+as vote counts, remain separate. Choice shuffling moves both targets with
+their options. The teacher is released before student training starts.
+
+Validation and final calibration use human targets. The calibration split
+is carved out before training with the original seed and fraction, so the
+fine-tuned student's held-out records remain held out. The student and
+control have matched settings and separate output directories. Their
+merged models are saved under their run's `final/`.
+
+Run the same commands on either cloud with the tasks `cache` (distillation
+config) and `train` (training config):
+
+```bash
+uv run python -m src.runpod.app --task cache \
+    --config configs/distillation/qwen3_8_27b.yml --gpu "NVIDIA H200"
+uv run python -m src.runpod.app --task train \
+    --config configs/train/qwen3_5_0_8b_distilled.yml
+
+modal run src/modal/app.py --task cache \
+    --config configs/distillation/qwen3_8_27b.yml --gpu H200
+modal run --detach src/modal/app.py --task train \
+    --config configs/train/qwen3_5_0_8b_distilled.yml
+```
+
+Place both fine-tuned models on that cloud's persistent `runs` volume.
+Regular model/dataset caching uses CPU; caching teacher soft labels uses GPU.
+Both use the same Modal cache function with different resource options.
+If `train` must build soft labels, its GPU must fit the teacher too. Pre-cache
+on a larger GPU to train the student on a smaller GPU afterward.
+Resume the student's new adapter with
+`--checkpoint runs/qwen3_5_0_8b_distilled/checkpoint-<step>`, keeping the
+original fine-tuned `backbone` and cache unchanged.
+
+Test the baseline, control, and distilled model on `test` and `test_ood`.
+Use the existing test config with `--model`, `--data.split`, and a distinct
+`--testing.output_dir` per run. Compare accuracy, Brier, ECE, and latency
+on matching hardware. No benchmark gain is assumed before these runs.
+See [the distillation spec](docs/DISTILLATION.md) for the cache and loss.
+
 ### Modal (cloud GPUs)
 The same tasks run on [Modal](https://modal.com). This needs `modal setup`
 and a Secret `huggingface` with `HF_TOKEN`.
@@ -159,9 +232,11 @@ overrides. Task logs go to `runs/logs/<pod_id>.log` on the network volume.
   `calibration`, `calibrating`)
 - `configs/test/`: test runs (`model`, optional `temperature`, `data`,
   `testing`, optional `system_two`)
+- `configs/distillation/`: soft label caching configs (`data`,
+  `distillation`); a training config can also have a `distillation` section
 
-The `training`, `calibrating` and `testing` sections take any Hugging Face
-`TrainingArguments` key.
+The `training`, `calibrating`, `testing`, and `generating` sections take any
+Hugging Face `TrainingArguments` key.
 
 ## Project layout
 ```
@@ -172,6 +247,7 @@ src/
   pipeline/     inference pipeline (/v1/systemone)
   evaluation/   evaluator and metrics
   training/     LoRA training
+  distillation/ offline teacher targets and student distillation
   calibration/  temperature calibration
   testing/      test script
   modal/        Modal apps (tasks and TensorBoard)

@@ -23,7 +23,7 @@ class DecisionEngineDataset(Dataset):
         records: The labelled records.
         shuffle_options: Shuffle the options of the question types that
             allow it (`choice`) at each access (the target follows its
-            option).
+            option, together with any cached teacher target).
         max_options: Max options per question (one letter each).
 
     Raises:
@@ -56,7 +56,8 @@ class DecisionEngineDataset(Dataset):
 
         Returns:
             `type`, `state` (text), `images`, `question` (`Question`) and
-            `target` (one probability per option).
+            `target` (human probabilities per option), plus `teacher_target`
+            when the record has cached teacher supervision.
 
         Raises:
             ValueError: If the label or a target key is unknown, or the target
@@ -68,15 +69,22 @@ class DecisionEngineDataset(Dataset):
         kind: QuestionType = question_type(spec["type"])
         question: Question = RequestParser.build_question(spec)
         target: list[float] = self._target(spec, kind, question)
+        teacher: list[float] | None = (
+            record["teacher_targets"][question_id]
+            if "teacher_targets" in record else None
+        )
         if self.shuffle_options and kind.shuffle:
-            question, target = self._shuffle(question, target)
-        return {
+            question, target, teacher = self._shuffle(question, target, teacher)
+        item: dict[str, Any] = {
             "type": spec["type"],
             "state": RequestParser.render_text(record["state"]),
             "images": RequestParser.load_media(record.get("media", [])),
             "question": question,
             "target": target,
         }
+        if teacher is not None:
+            item["teacher_target"] = teacher
+        return item
 
     @staticmethod
     def _target(
@@ -95,8 +103,8 @@ class DecisionEngineDataset(Dataset):
 
     @staticmethod
     def _shuffle(
-        question: Question, target: list[float]
-    ) -> tuple[Question, list[float]]:
+        question: Question, target: list[float], teacher: list[float] | None
+    ) -> tuple[Question, list[float], list[float] | None]:
         order: list[int] = torch.randperm(len(question.options)).tolist()
         descriptions = question.descriptions or [None] * len(question.options)
         shuffled = Question(
@@ -104,4 +112,5 @@ class DecisionEngineDataset(Dataset):
             [question.options[j] for j in order],
             [descriptions[j] for j in order],
         )
-        return shuffled, [target[j] for j in order]
+        return (shuffled, [target[j] for j in order],
+                [teacher[j] for j in order] if teacher is not None else None)

@@ -48,6 +48,8 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from src.modal.cache import cache_uses_gpu
+
 API: str = "https://api.runpod.io/v2"
 REPOSITORY: str = "https://github.com/pierclgr/ima.git"
 # has git and curl
@@ -56,7 +58,7 @@ VOLUME: str = "/workspace"
 CODE: str = "/root/ima"
 # gpu of the tasks when the config's `runpod` section names none
 GPU: str = "NVIDIA H200"
-# cpu pod of the `cache` task: 4 vCPUs, 16 GB RAM
+# cpu pod for regular model/data caching: 4 vCPUs, 16 GB RAM
 CPU: dict[str, str | int] = {"id": "cpu5g", "vcpuCount": 4}
 # container disk in GB (the code and its environment)
 DISK: int = 50
@@ -170,7 +172,7 @@ def pod_request(
         task: `cache`, `train`, `calibrate` or `test`.
         argv: Task arguments (config path and overrides).
         ref: Commit to run.
-        gpu: RunPod GPU id (ignored by `cache`, CPU only).
+        gpu: RunPod GPU id (regular model/data caching uses CPU only).
         data_center: Data center of the network volume.
         volume_id: Network volume id.
 
@@ -194,7 +196,7 @@ def pod_request(
         "entrypoint": ["bash", "-c"],
         "cmd": [start_command(task, argv, ref)],
     }
-    if task == "cache":
+    if task == "cache" and not cache_uses_gpu(argv[0]):
         body["cpu"] = CPU
     else:
         body["gpu"] = {"id": gpu, "count": 1}
@@ -212,7 +214,8 @@ def main() -> None:
         required=True,
         help="config path, relative to the repository root (a training config "
         "for cache and train, a calibration config for calibrate, a test "
-        "config for test)",
+        "config for test; a distillation config for cache builds the teacher "
+        "soft labels)",
     )
     parser.add_argument("--overrides", default="", help='e.g. "--lora.r 8"')
     parser.add_argument("--gpu", default="", help="instead of the config's runpod.gpu")

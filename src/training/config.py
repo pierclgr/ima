@@ -7,6 +7,7 @@ from transformers import TrainingArguments
 from src.calibration.config import CalibrationSettings
 from src.common.config_parser import ConfigParser
 from src.data.config import DataSettings
+from src.distillation.config import DistillationSettings
 
 
 @dataclass
@@ -37,8 +38,8 @@ class TrainConfig:
     the sections `lora`, `data`, `training` (any HF `TrainingArguments` key,
     except `num_train_epochs`, which is named `num_epochs`, and `seed`, which
     is top-level; `logging_steps` defaults to 1, i.e. every weight update) and
-    the optional `calibration`. Values are converted to the field types, so
-    `1e-4` works.
+    the optional `calibration` and `distillation` (offline distillation).
+    Values are converted to the field types, so `1e-4` works.
 
     Attributes:
         backbone: HF id or local path of the multimodal backbone.
@@ -50,6 +51,8 @@ class TrainConfig:
             split); also set as `training.seed`.
         checkpoint: `Trainer` checkpoint to resume training from (e.g.
             `runs/<run>/checkpoint-500`), or None to start fresh.
+        distillation: Offline distillation settings, or None for ordinary
+            supervised training.
     """
 
     backbone: str
@@ -59,6 +62,7 @@ class TrainConfig:
     calibration: CalibrationSettings | None = None
     seed: int = 42
     checkpoint: str | None = None
+    distillation: DistillationSettings | None = None
 
     @classmethod
     def from_yaml(
@@ -82,7 +86,7 @@ class TrainConfig:
             path,
             overrides,
             keys=["backbone", "seed", "checkpoint"],
-            sections=[*SECTIONS, "calibration"],
+            sections=[*SECTIONS, "calibration", "distillation"],
         )
         backbone: str = str(values.pop("backbone"))
         seed: int = int(values.pop("seed", cls.seed))
@@ -97,6 +101,9 @@ class TrainConfig:
         if "num_epochs" in training:
             training["num_train_epochs"] = training.pop("num_epochs")
         training.setdefault("logging_steps", 1)
+        distillation: DistillationSettings | None = ConfigParser.settings(
+            values, "distillation", DistillationSettings
+        )
         calibration: CalibrationSettings | None = ConfigParser.settings(
             values, "calibration", CalibrationSettings
         )
@@ -110,5 +117,6 @@ class TrainConfig:
             calibration=calibration,
             seed=seed,
             checkpoint=None if checkpoint is None else str(checkpoint),
+            distillation=distillation,
             **sections,
         )

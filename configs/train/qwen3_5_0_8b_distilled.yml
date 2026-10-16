@@ -1,0 +1,53 @@
+# new lora on the merged fine-tuned 0.8b student, distilled offline from the
+# fine-tuned 27b teacher; missing soft labels are built before training
+backbone: runs/qwen3_5_0_8b/final
+seed: 42
+checkpoint: null
+
+lora:
+  r: 16
+  alpha: 32
+
+data:
+  dataset: Jacqkues/kev-vision-decisions-full
+  train: train
+  validation: validation
+
+distillation:
+  teacher: runs/qwen3_8_27b/final
+  soft_labels: runs/qwen3_8_27b/soft_labels
+  alpha: 0.25
+  temperature: 1.0
+  generating:
+    per_device_eval_batch_size: 4
+    dataloader_num_workers: 16
+    bf16: true
+
+# same extra epoch and optimizer settings as the supervised control
+training:
+  output_dir: runs/qwen3_5_0_8b_distilled
+  num_epochs: 1
+  learning_rate: 1.1e-3
+  lr_scheduler_type: cosine
+  warmup_steps: 0.1
+  per_device_train_batch_size: 512
+  per_device_eval_batch_size: 512
+  gradient_accumulation_steps: 1
+  bf16: true
+  gradient_checkpointing: true
+  dataloader_num_workers: 16
+  eval_strategy: epoch
+  save_strategy: steps
+  save_steps: 15
+  save_total_limit: 2
+  report_to: tensorboard
+
+calibration:
+  temperature: fit
+  split: 0.1
+
+modal:
+  gpu: H100
+
+runpod:
+  gpu: NVIDIA H100 80GB HBM3

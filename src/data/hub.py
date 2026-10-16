@@ -11,7 +11,8 @@ class HubRecordLoader:
 
     Rows hold `state` and `questions` as JSON strings and an optional `image`
     column (`{bytes, path}` or None). They are converted on access to records
-    for `DecisionEngineDataset`: `state`, `questions` and `media`.
+    for `DecisionEngineDataset`: `state`, `questions` and `media`. An optional
+    JSON `teacher_targets` column is also passed through for distillation.
 
     Args:
         repo_id: HF dataset id, e.g. `Jacqkues/kev-vision-decisions-full`.
@@ -40,7 +41,7 @@ class HubRecordLoader:
 
     @staticmethod
     def _to_records(batch: dict[str, list[Any]]) -> dict[str, list[Any]]:
-        return {
+        records = {
             "state": [json.loads(state) for state in batch["state"]],
             "questions": [json.loads(questions) for questions in batch["questions"]],
             "media": [
@@ -48,3 +49,8 @@ class HubRecordLoader:
                 for image in batch["image"]
             ],
         }
+        if "teacher_targets" in batch:
+            records["teacher_targets"] = [
+                json.loads(targets) for targets in batch["teacher_targets"]
+            ]
+        return records

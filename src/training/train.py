@@ -20,6 +20,9 @@ from src.common.prompt import PromptBuilder
 from src.data.collator import DecisionEngineCollator
 from src.data.dataset import DecisionEngineDataset
 from src.data.hub import HubRecordLoader
+from src.distillation.config import DistillationSettings
+from src.distillation.generate import ensure_targets
+from src.distillation.trainer import DistillationCollator, DistillationTrainer
 from src.evaluation.metrics import DecisionMetrics
 from src.model.loader import ModelLoader
 from src.model.system_one import PreTrainedSystemOneModel
@@ -52,6 +55,7 @@ def build_trainer(
     eval_records: Any | None,
     lora: LoraSettings,
     training_args: TrainingArguments,
+    distillation: DistillationSettings | None = None,
 ) -> Trainer:
     """Adds LoRA to the model and builds the `Trainer`.
 
@@ -65,6 +69,8 @@ def build_trainer(
             `remove_unused_columns` False, since the collator needs the raw
             items. TensorBoard logs
             go to `output_dir` (`TENSORBOARD_LOGGING_DIR`).
+        distillation: Distillation settings (the records then carry the
+            cached teacher targets). None keeps ordinary supervised training.
 
     Returns:
         The trainer.
@@ -88,13 +94,18 @@ def build_trainer(
     os.environ["TENSORBOARD_LOGGING_DIR"] = training_args.output_dir
     # the lora weights are created before `Trainer` sets the seed
     set_seed(training_args.seed)
-    return Trainer(
+    prompt = PromptBuilder(processor, max_options)
+    trainer_type = DistillationTrainer if distillation is not None else Trainer
+    extra = {"distillation": distillation} if distillation is not None else {}
+    return trainer_type(
         model=get_peft_model(model, lora_config),
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        data_collator=DecisionEngineCollator(PromptBuilder(processor, max_options)),
+        data_collator=(DistillationCollator(prompt) if distillation is not None
+                       else DecisionEngineCollator(prompt)),
         compute_metrics=DecisionMetrics(),
+        **extra,
     )
 
 
@@ -106,6 +117,11 @@ def main(argv: list[str] | None = None) -> None:
     training records is carved out before training (seeded with
     `seed`) and used only for the fit.
 
+    If the config has a `distillation` section, the teacher soft labels are
+    built first when missing (the teacher is released before the student
+    loads) and the loss mixes them with the human targets. Validation and
+    calibration use only the human targets.
+
     Usage: `python -m src.training.train <config.yml> [--section.key value]`.
 
     Args:
@@ -116,9 +132,18 @@ def main(argv: list[str] | None = None) -> None:
     if not argv:
         raise SystemExit(__doc__)
     config = TrainConfig.from_yaml(argv[0], argv[1:])
+    soft_labels = (
+        None if config.distillation is None
+        else ensure_targets(config.distillation, config.data)
+    )
     model, processor = ModelLoader.load(config.backbone)
     loader = HubRecordLoader(config.data.dataset)
     train_records = loader.load(config.data.train)
+    if soft_labels is not None:
+        train_records = soft_labels.attach(
+            train_records, config.data.dataset, "train", config.data.train,
+            model.config.max_options,
+        )
     calibration_records = None
     if config.calibration is not None and config.calibration.temperature == "fit":
         train_records, calibration_records = TemperatureCalibrator.split(
@@ -134,6 +159,7 @@ def main(argv: list[str] | None = None) -> None:
         eval_records,
         config.lora,
         config.training,
+        config.distillation,
     )
     trainer.train(resume_from_checkpoint=config.checkpoint)
     merged: PreTrainedSystemOneModel = trainer.model.merge_and_unload()

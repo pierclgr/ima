@@ -39,6 +39,8 @@ from pathlib import Path
 import modal
 import yaml
 
+from src.modal.cache import cache_uses_gpu
+
 ROOT: str = "/root"
 # modal's maximum function timeout
 DAY: int = 24 * 60 * 60
@@ -69,7 +71,7 @@ app = modal.App(
 
 @app.function(cpu=4, memory=16384, timeout=DAY)
 def cache(argv: list[str]) -> None:
-    """Runs `src.modal.cache` with `argv` (no GPU)."""
+    """Runs `src.modal.cache`; the launcher selects CPU or GPU resources."""
     from src.modal.cache import main
 
     main(argv)
@@ -130,10 +132,11 @@ def main(task: str, config: str, overrides: str = "", gpu: str = "") -> None:
         task: `cache`, `train`, `calibrate` or `test`.
         config: Config path, relative to the repository root (a training
             config for `cache` and `train`, a calibration config for
-            `calibrate`, a test config for `test`).
+            `calibrate`, a test config for `test`; a distillation config
+            for `cache` builds the teacher soft labels).
         overrides: Config overrides, e.g. `"--lora.r 8 --checkpoint x"`.
         gpu: GPU instead of the config's `modal.gpu` (e.g. `H100`,
-            `A100-80GB`). Ignored by `cache` (CPU only).
+            `A100-80GB`). Ignored by regular model/data caching (CPU only).
 
     Raises:
         ValueError: If the task is unknown.
@@ -145,5 +148,10 @@ def main(task: str, config: str, overrides: str = "", gpu: str = "") -> None:
         if task == "cache"
         else TASKS[task].with_options(gpu=config_gpu(config, gpu))
     )
+    if task == "cache" and cache_uses_gpu(config):
+        # the 27b teacher is loaded into host RAM before moving to the GPU
+        function = function.with_options(
+            gpu=config_gpu(config, gpu), memory=65536,
+        )
     # a spawned call survives ctrl+c with --detach, a `.remote()` one is cancelled
     function.spawn([config, *shlex.split(overrides)]).get()
