@@ -72,6 +72,17 @@ def test_plain_training_config_has_no_distillation(tmp_path: Path) -> None:
     assert TrainConfig.from_yaml(path).distillation is None
 
 
+def test_training_config_adapter_key(tmp_path: Path) -> None:
+    path = tmp_path / "train.yml"
+    path.write_text(
+        "backbone: student\ndata: {dataset: dataset, train: train}\n"
+        "training: {output_dir: run, use_cpu: true, report_to: none}\n",
+    )
+    assert TrainConfig.from_yaml(path).adapter is None
+    config = TrainConfig.from_yaml(path, ["--adapter", "runs/x/checkpoint-1"])
+    assert config.adapter == "runs/x/checkpoint-1"
+
+
 def test_cache_only_config(tmp_path: Path) -> None:
     path = tmp_path / "cache.yml"
     path.write_text(

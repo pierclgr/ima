@@ -11,7 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, PeftModel, get_peft_model
 from torch import nn
 from transformers import Trainer, TrainingArguments, set_seed
 
@@ -56,6 +56,7 @@ def build_trainer(
     lora: LoraSettings,
     training_args: TrainingArguments,
     distillation: DistillationSettings | None = None,
+    adapter: str | None = None,
 ) -> Trainer:
     """Adds LoRA to the model and builds the `Trainer`.
 
@@ -71,6 +72,9 @@ def build_trainer(
             go to `output_dir` (`TENSORBOARD_LOGGING_DIR`).
         distillation: Distillation settings (the records then carry the
             cached teacher targets). None keeps ordinary supervised training.
+        adapter: LoRA adapter to continue training (its weights are loaded
+            as trainable and its own LoRA settings replace `lora`), or None
+            for a new LoRA.
 
     Returns:
         The trainer.
@@ -97,8 +101,12 @@ def build_trainer(
     prompt = PromptBuilder(processor, max_options)
     trainer_type = DistillationTrainer if distillation is not None else Trainer
     extra = {"distillation": distillation} if distillation is not None else {}
+    peft_model = (
+        get_peft_model(model, lora_config) if adapter is None
+        else PeftModel.from_pretrained(model, adapter, is_trainable=True)
+    )
     return trainer_type(
-        model=get_peft_model(model, lora_config),
+        model=peft_model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
@@ -160,6 +168,7 @@ def main(argv: list[str] | None = None) -> None:
         config.lora,
         config.training,
         config.distillation,
+        config.adapter,
     )
     trainer.train(resume_from_checkpoint=config.checkpoint)
     merged: PreTrainedSystemOneModel = trainer.model.merge_and_unload()

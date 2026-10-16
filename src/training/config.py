@@ -34,8 +34,8 @@ SECTIONS: dict[str, type] = {
 class TrainConfig:
     """Training run configuration, loaded from a YAML file.
 
-    The YAML has a `backbone` key, optional `seed` and `checkpoint` keys and
-    the sections `lora`, `data`, `training` (any HF `TrainingArguments` key,
+    The YAML has a `backbone` key, optional `seed`, `checkpoint` and
+    `adapter` keys and the sections `lora`, `data`, `training` (any HF `TrainingArguments` key,
     except `num_train_epochs`, which is named `num_epochs`, and `seed`, which
     is top-level; `logging_steps` defaults to 1, i.e. every weight update) and
     the optional `calibration` and `distillation` (offline distillation).
@@ -51,6 +51,9 @@ class TrainConfig:
             split); also set as `training.seed`.
         checkpoint: `Trainer` checkpoint to resume training from (e.g.
             `runs/<run>/checkpoint-500`), or None to start fresh.
+        adapter: LoRA adapter (e.g. `runs/<run>/checkpoint-500`) whose
+            weights start the training with a fresh optimizer and schedule
+            (its own LoRA settings replace `lora`), or None for a new LoRA.
         distillation: Offline distillation settings, or None for ordinary
             supervised training.
     """
@@ -62,6 +65,7 @@ class TrainConfig:
     calibration: CalibrationSettings | None = None
     seed: int = 42
     checkpoint: str | None = None
+    adapter: str | None = None
     distillation: DistillationSettings | None = None
 
     @classmethod
@@ -85,12 +89,13 @@ class TrainConfig:
         values: dict[str, Any] = ConfigParser.load(
             path,
             overrides,
-            keys=["backbone", "seed", "checkpoint"],
+            keys=["backbone", "seed", "checkpoint", "adapter"],
             sections=[*SECTIONS, "calibration", "distillation"],
         )
         backbone: str = str(values.pop("backbone"))
         seed: int = int(values.pop("seed", cls.seed))
         checkpoint: Any = values.pop("checkpoint", None)
+        adapter: Any = values.pop("adapter", None)
         training: dict[str, Any] = values.get("training") or {}
         values["training"] = training
         if "num_train_epochs" in training:
@@ -117,6 +122,7 @@ class TrainConfig:
             calibration=calibration,
             seed=seed,
             checkpoint=None if checkpoint is None else str(checkpoint),
+            adapter=None if adapter is None else str(adapter),
             distillation=distillation,
             **sections,
         )

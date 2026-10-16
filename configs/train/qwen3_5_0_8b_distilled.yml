@@ -1,8 +1,11 @@
-# new lora on the merged fine-tuned 0.8b student, distilled offline from the
-# fine-tuned 27b teacher; missing soft labels are built before training
-backbone: runs/qwen3_5_0_8b/final
+# the baseline lora (raw qwen3.5-0.8b backbone) continues training, distilled
+# offline from the fine-tuned 27b teacher; missing soft labels are built
+# before training
+backbone: Qwen/Qwen3.5-0.8B
 seed: 42
 checkpoint: null
+# weights only: fresh optimizer and schedule (the lora section is not used)
+adapter: runs/qwen3_5_0_8b/checkpoint-329
 
 lora:
   r: 16
@@ -23,11 +26,11 @@ distillation:
     dataloader_num_workers: 16
     bf16: true
 
-# same extra epoch and optimizer settings as the supervised control
+# lower learning rate than the baseline: the adapter is already trained
 training:
   output_dir: runs/qwen3_5_0_8b_distilled
   num_epochs: 1
-  learning_rate: 1.1e-3
+  learning_rate: 2e-4
   lr_scheduler_type: cosine
   warmup_steps: 0.1
   per_device_train_batch_size: 256

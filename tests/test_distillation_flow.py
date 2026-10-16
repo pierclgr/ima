@@ -178,3 +178,29 @@ def test_raw_backbones_as_teacher_and_student(
     manifest = json.loads((tmp_path / "cache" / "manifest.json").read_text())
     assert manifest["temperature"] == 1.0
     assert (output / "final" / "processor.json").is_file()
+
+
+def test_adapter_weights_are_loaded_and_trainable(
+    tmp_path: Path, records: datasets.Dataset,
+    tiny_model: PreTrainedSystemOneModel,
+) -> None:
+    fresh = PreTrainedSystemOneModel(tiny_model.config, backbone=TinyBackbone())
+    args = TrainingArguments(output_dir=str(tmp_path), use_cpu=True,
+                             report_to="none", max_steps=1,
+                             per_device_train_batch_size=2)
+    source = build_trainer(tiny_model, TinyProcessor(), records, records,
+                           LoraSettings(r=2, alpha=4), args)
+    with torch.no_grad():
+        for name, weight in source.model.named_parameters():
+            if "lora_B" in name:
+                weight.fill_(0.5)
+    source.model.save_pretrained(tmp_path / "adapter")
+    trainer = build_trainer(fresh, TinyProcessor(), records, records,
+                            LoraSettings(r=99, alpha=1), args,
+                            adapter=str(tmp_path / "adapter"))
+    lora = {name: weight for name, weight in trainer.model.named_parameters()
+            if "lora_" in name}
+    assert trainer.model.peft_config["default"].r == 2
+    assert lora and all(weight.requires_grad for weight in lora.values())
+    assert all(torch.all(weight == 0.5) for name, weight in lora.items()
+               if "lora_B" in name)
