@@ -295,14 +295,6 @@ Accuracy against time per question, one graph per test set:
 
 ![Accuracy vs seconds per question on test_ood](assets/accuracy_vs_time_test_ood.png)
 
-Seconds/question is the model's time only (System One: the forward pass;
-System Two: the generation up to the final answer, thinking off), without
-data loading. All times come from the same setup: Modal, NVIDIA H100 80GB
-(pinned), batch 1, 4 data workers, 8 reserved CPU cores, runs one after the
-other, 200 random records per test set (about 265 questions on `test`, 200 on
-`test_ood`), after 10 warm-up questions. Accuracy, Brier and ECE come from
-runs on the full test sets.
-
 ## Limits
 - Max 26 options per question.
 - One GPU only, no multi-GPU training yet.
