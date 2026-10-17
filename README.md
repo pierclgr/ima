@@ -64,7 +64,7 @@ from src.pipeline.system_one import SystemOnePipeline
 pipeline = SystemOnePipeline.from_pretrained("runs/qwen3_5_0_8b/final")
 response = pipeline({
     "state": "A customer writes: 'I was charged twice this month.'",
-    "media": [],
+    "files": [],
     "questions": {
         "billing": {"type": "noul", "instructions": "Is it about billing?"},
         "tone": {
@@ -77,6 +77,62 @@ response = pipeline({
 # {"model": ..., "answers": {"billing": {"type": "noul", "noul": <p_yes>},
 #  "tone": {"type": "choice", "choice": "angry", ...}}, "usage": {...}}
 ```
+
+Requests follow llama.cpp's native System One format. Put images in
+`files` (or `images`) as base64 image data URLs, up to eight images per
+request. This replaces the old `media` field. Score questions accept 2–10
+levels; score confidence follows llama.cpp's formula.
+
+### GGUF export and API server
+
+Train with the existing scripts, export the merged `final/` directory, then
+host it with llama.cpp's native `POST /v1/systemone` API. The server performs
+the model computation on its CPU or GPU. It needs no Python training
+environment. This integration serves System One only.
+
+Build the tested llama.cpp revision (needs Git, CMake, and a C++ compiler):
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp.git ../llama.cpp
+git -C ../llama.cpp checkout c0fd78626405c6d9b934efef0ec7291fcc20e3d6
+cmake -S ../llama.cpp -B ../llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build ../llama.cpp/build --config Release --target llama-server llama-quantize -j 4
+uv sync --extra llamacpp
+```
+
+For NVIDIA GPUs, add `-DGGML_CUDA=ON` to the CMake configure command.
+Metal is enabled by default on macOS; CPU serving is also supported.
+
+Export and start the server:
+
+```bash
+uv run --extra llamacpp python -m src.llamacpp.export runs/qwen3_5_0_8b/final exports/qwen3_5_0_8b --llama-cpp-dir ../llama.cpp
+python -m src.llamacpp.serve exports/qwen3_5_0_8b --llama-cpp-dir ../llama.cpp
+```
+
+The export contains `model-F16.gguf` and `mmproj-F16.gguf`. It preserves
+the trained weights, prompt, and calibration temperature. It reads the
+source weights lazily and does not change the source checkpoint. Export a
+merged model, not an adapter checkpoint. Choose a new output directory for
+each export.
+
+Use `--quantization Q8_0` or `--quantization Q4_K_M` on the export command
+for a smaller language model. The projector stays F16. Quantization can
+change probabilities and calibration; GGUF recalibration is not included.
+
+The server defaults to `127.0.0.1:8080`, an 8192-token context, and automatic
+GPU use. The launcher accepts `--host`, `--port`, `--ctx-size`,
+`--gpu-layers` (`0` for CPU), and `--api-key`. For remote access, set
+`--host 0.0.0.0`. Native `/health` and `/v1/models` endpoints are available.
+
+```bash
+curl http://127.0.0.1:8080/v1/systemone -H 'Content-Type: application/json' -d '{"state":"I was charged twice.","questions":{"billing":{"type":"noul","instructions":"Is this about billing?"}}}'
+```
+
+For images, add `"files": ["data:image/png;base64,..."]` to the JSON body.
+See [docs/LLAMACPP.md](docs/LLAMACPP.md) for the export contract and checks,
+and the [native API documentation](https://github.com/ggml-org/llama.cpp/blob/c0fd78626405c6d9b934efef0ec7291fcc20e3d6/tools/server/README.md)
+for the complete request and response format.
 
 ### Train, calibrate, test
 Each task reads a YAML config. You can change any value from the command
@@ -110,6 +166,53 @@ uv run python -m src.training.train configs/train/qwen3_5_0_8b.yml --training.le
 - Testing: reports accuracy, Brier score, expected calibration error (ECE),
   loss and seconds per question. System Two also reports the share of
   outputs with no valid answer.
+
+### Test local GGUF models
+
+Use the same test command with the GGUF config. It loads the model once
+and runs one question at a time through a small native worker. No server
+is needed. CMake and a C++17 compiler build the worker on first use in
+the ignored `.cache/llamacpp/` directory. The llama.cpp checkout must
+already have shared libraries (`BUILD_SHARED_LIBS=ON`, the default).
+
+```bash
+uv run python -m src.testing.test configs/test/qwen3_5_0_8b_llamacpp.yml
+```
+
+The config uses `~/llama.cpp`, Metal/CUDA when available, and the local
+Parquet files in `datasets/test/` and `datasets/test_ood/`. Set
+`--llamacpp.llama_cpp_dir PATH` for another checkout, or
+`--llamacpp.gpu_layers 0` for CPU inference, including the projector.
+`data.dataset` also accepts the usual HF Hub dataset id. Split slices and
+`data.sample` work as before; sampling selects records with a fixed seed.
+
+Run all three exports on both full splits:
+
+```bash
+for format in f16 q8 q4; do
+  for split in test test_ood; do
+    uv run python -m src.testing.test \
+      configs/test/qwen3_5_0_8b_llamacpp.yml \
+      --model "exports/qwen3_5_0_8b_${format}" \
+      --data.split "$split" \
+      --testing.output_dir "runs/llamacpp/${format}/${split}"
+  done
+done
+```
+
+Each output directory gets `test_metrics.json`. It includes accuracy,
+loss, Brier score, ECE, backend/device, evaluated/skipped/timed question
+counts, and `test_seconds_per_question`. The native clock measures vision
+encoding, projection, and the language model forward pass. It excludes
+loading, image preparation, tokenization, IPC, and metric computation.
+Model memory is reset for each question. The first ten questions count in
+accuracy but not timing; more than ten eligible questions are required.
+`--temperature 1` overrides the saved calibration for all question types.
+
+Offline scoring keeps up to 26 levels, including the 11-level questions
+in `test_ood`. The API limit remains 10. With the downloaded datasets,
+`test` evaluates 4855 questions and skips 64 choices with 77 options;
+`test_ood` evaluates all 1477 questions.
 
 ### Offline distillation
 Distill the calibrated fine-tuned Qwen3.8-27B into the fine-tuned

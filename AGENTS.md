@@ -37,19 +37,27 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
       question, choice option shuffle)
     - `collator.py`: `DecisionEngineCollator` (batch with `labels`,
       `option_mask`)
-    - `hub.py`: `HubRecordLoader` (HF Hub dataset in the kev-vision layout
-      to records)
+    - `hub.py`: `HubRecordLoader` (HF Hub or local Parquet splits in the
+      kev-vision layout to records)
     - `config.py`: `DataSettings` (training data on the HF Hub, shared by
       the training and calibration configs)
   - `pipeline/`: inference
     - `system_one.py`: `SystemOnePipeline` (HF `ChunkPipeline`, Jev
       `/v1/systemone` request and response; `from_pretrained` loads a
       trained model or a raw backbone)
+  - `llamacpp/`: GGUF export, native System One serving and offline runtime
+    - `export.py`: lazily unwraps merged checkpoints for llama.cpp's
+      converter; adds the trained prompt and calibration metadata
+    - `prompt.py`: native `systemone` template from the source processor
+    - `serve.py`: standard-library launcher for native `llama-server`
+    - `runtime.py`: persistent native worker, built under `.cache/llamacpp`
+    - `native/`: C++17 adapter linked to the checkout's shared libraries
   - `evaluation/`: running models on labelled records (training and testing)
     - `evaluator.py`: `DecisionEvaluator` (runs System One or Two on
       records)
     - `metrics.py`: `DecisionMetrics` (accuracy, Brier score, ECE, System
       Two errors)
+    - `llamacpp.py`: native predictions with shared targets and metrics
   - `training/`: LoRA training
     - `config.py`: `TrainConfig` (YAML run config: `backbone`, `seed`,
       `lora`, `data`, `training`, optional `calibration` and
@@ -71,7 +79,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
     - `trainer.py`: teacher collator, masked CE/KL loss, human-only eval
   - `testing/`: standalone testing of a trained model
     - `config.py`: `TestConfig` (YAML: `model`, optional `temperature`,
-      `data`, `testing`)
+      `backend` default `hf`, `data`, `testing`, optional `llamacpp`)
     - `test.py`: test script (metrics and seconds per question on a
       dataset split: model time only, after 10 warm-up batches; optional
       random `data.sample`)
@@ -99,6 +107,13 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - `uv sync`: install the environment (includes `flash-linear-attention`,
   fast Qwen3.5/3.8 linear attention on CUDA)
 - `uv run pytest`: run the tests
+- `uv sync --extra llamacpp`: add the GGUF export dependency
+- `uv run --extra llamacpp python -m src.llamacpp.export MODEL OUTPUT
+  --llama-cpp-dir CHECKOUT [--quantization F16|Q8_0|Q4_K_M]`: export a
+  merged checkpoint and its projector (source stays unchanged)
+- `python -m src.llamacpp.serve EXPORT --llama-cpp-dir CHECKOUT
+  [--host HOST] [--port PORT] [--ctx-size N] [--gpu-layers N]
+  [--api-key KEY]`: start the native System One API
 - `uv run python -m src.training.train configs/train/<run>.yml
   [--section.key value]`: train (the gated dataset needs `hf auth login`)
 - `uv run python -m src.calibration.calibrate configs/calibration/<run>.yml
@@ -107,6 +122,10 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
   [--section.key value]`: test a trained model (or a raw HF backbone in
   `model`, zero-shot; a `system_two` section for System Two), prints the
   metrics
+- The same test command with `backend: llamacpp` uses a GGUF export as
+  `model`, one question per call, and local Parquet or Hub data. Native
+  inference seconds exclude preparation and IPC; the first ten questions
+  count in accuracy but not timing. GGUF testing does not use HF arguments
 - `uv run python -m src.modal.cache configs/train/<run>.yml`: download
   the backbone and dataset of a config
 - `uv run python -m src.modal.cache
@@ -143,7 +162,17 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - See `docs/DISTILLATION.md` for the implementation and experiment protocol
 
 ## Conventions
+- System One API: native llama.cpp `files` (`images` alias), image data
+  URLs, at most eight images, score questions with 2–10 levels, native
+  score confidence; dataset records keep PIL images in `files`
+- Offline score datasets keep all levels up to the model's option limit;
+  enforce the 10-level API limit only at the public pipeline boundary
+- GGUF: use llama.cpp's `openjev` scoring metadata with this project's
+  prompt and temperature; never copy OpenJev's calibration constants
+- See `docs/LLAMACPP.md` for the tested revision and validation workflow
 - Python: PEP8, Google docstrings, type hints everywhere (PEP 484)
+- Native offline adapter: C++17, existing llama.cpp public/helper APIs,
+  device synchronization around model work, no upstream source changes
 - Comments: start lowercase, no ending period
 - File names: `snake_case.py`; Markdown: `UPPER_SNAKE_CASE.md`
 - Markdown: max 80 chars per line

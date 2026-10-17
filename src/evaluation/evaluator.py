@@ -51,9 +51,12 @@ class DecisionEvaluator:
             `predictions` (option logits, probabilities and, for System Two,
             errors), `label_ids` and `metrics` (`test_loss`,
             `test_accuracy`, `test_brier`, `test_ece`, System Two
-            `test_errors`).
+            `test_errors`), plus evaluated and skipped question counts.
         """
         dataset = DecisionEngineDataset(
             records, shuffle_options=False, max_options=self.max_options
         )
-        return self.trainer.predict(dataset)
+        output = self.trainer.predict(dataset)
+        output.metrics["test_evaluated_questions"] = len(dataset)
+        output.metrics["test_skipped_questions"] = dataset.skipped
+        return output

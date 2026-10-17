@@ -16,6 +16,9 @@ dependencies = [
     "transformers>=5.18.0",
 ]
 
+[project.optional-dependencies]
+llamacpp = ["sentencepiece>=0.2.0,<0.3"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

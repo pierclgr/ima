@@ -7,15 +7,15 @@ from huggingface_hub import snapshot_download
 
 
 class HubRecordLoader:
-    """Loads labelled records from a HF Hub dataset in the kev-vision layout.
+    """Loads labelled Hub or local Parquet records in the kev-vision layout.
 
     Rows hold `state` and `questions` as JSON strings and an optional `image`
     column (`{bytes, path}` or None). They are converted on access to records
-    for `DecisionEngineDataset`: `state`, `questions` and `media`. An optional
+    for `DecisionEngineDataset`: `state`, `questions` and `files`. An optional
     JSON `teacher_targets` column is also passed through for distillation.
 
     Args:
-        repo_id: HF dataset id, e.g. `Jacqkues/kev-vision-decisions-full`.
+        repo_id: HF dataset id or local root containing split directories.
     """
 
     def __init__(self, repo_id: str) -> None:
@@ -27,11 +27,20 @@ class HubRecordLoader:
         The dataset repo is downloaded once into `<HF_DATASETS_CACHE>/hub`
         (not the HF Hub model cache), then loaded from that local copy.
         """
-        cache_dir = Path(datasets.config.HF_DATASETS_CACHE) / "hub"
-        local_dir: str = snapshot_download(
-            repo_id=self.repo_id, repo_type="dataset", cache_dir=cache_dir
-        )
-        return self.convert(datasets.load_dataset(local_dir, split=split))
+        local_dir = Path(self.repo_id).expanduser()
+        if not local_dir.is_dir():
+            cache_dir = Path(datasets.config.HF_DATASETS_CACHE) / "hub"
+            local_dir = Path(snapshot_download(
+                repo_id=self.repo_id, repo_type="dataset", cache_dir=cache_dir
+            ))
+        split_name = split.split("[")[0]
+        files = sorted((local_dir / split_name).glob("*.parquet"))
+        if files:
+            return self.convert(datasets.load_dataset(
+                "parquet", data_files={split_name: [str(path) for path in files]},
+                split=split, cache_dir=".cache/datasets",
+            ))
+        return self.convert(datasets.load_dataset(str(local_dir), split=split))
 
     @staticmethod
     def convert(dataset: datasets.Dataset) -> datasets.Dataset:
@@ -44,8 +53,8 @@ class HubRecordLoader:
         records = {
             "state": [json.loads(state) for state in batch["state"]],
             "questions": [json.loads(questions) for questions in batch["questions"]],
-            "media": [
-                [{"type": "image", "data": image}] if image is not None else []
+            "files": [
+                [image] if image is not None else []
                 for image in batch["image"]
             ],
         }

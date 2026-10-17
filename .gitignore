@@ -3,6 +3,9 @@ __pycache__/
 .DS_Store
 
 docs/
-!docs/DISTILLATION.md
 .worktrees
 weights/
+datasets/
+exports/
+.cache/
+tests/

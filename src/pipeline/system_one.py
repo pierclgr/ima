@@ -61,11 +61,12 @@ class SystemOnePipeline(ChunkPipeline):
 
     def preprocess(self, request: dict[str, Any]) -> Iterator[dict[str, Any]]:
         """Yields the model inputs of each question of the request."""
-        state_text: str = RequestParser.render_text(request["state"])
-        images = RequestParser.load_media(request.get("media", []))
+        state_text, images = RequestParser.parse_inputs(request)
         questions: dict[str, dict[str, Any]] = request["questions"]
         for i, (question_id, spec) in enumerate(questions.items()):
             question = RequestParser.build_question(spec)
+            if spec["type"] == "score" and len(question.options) > 10:
+                raise ValueError("API score criteria allow at most 10 levels")
             inputs = self.prompt.encode(
                 [self.prompt.build_messages(state_text, question, images)]
             )

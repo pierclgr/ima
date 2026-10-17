@@ -5,6 +5,7 @@ from PIL import Image
 from transformers import BatchFeature
 
 from src.constants import SYSTEM_ONE_INSTRUCTION
+from src.common.request import RequestParser
 from src.common.types import Question
 
 
@@ -59,7 +60,8 @@ class PromptBuilder:
             question.options
         )
         options: str = "\n".join(
-            f"{letter}. {option}" + (f": {description}" if description else "")
+            f"{letter}. {RequestParser.render_text(option)}"
+            + (f": {RequestParser.render_text(description)}" if description else "")
             for letter, option, description in zip(
                 self.letters, question.options, descriptions
             )

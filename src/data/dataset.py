@@ -75,10 +75,11 @@ class DecisionEngineDataset(Dataset):
         )
         if self.shuffle_options and kind.shuffle:
             question, target, teacher = self._shuffle(question, target, teacher)
+        state, images = RequestParser.parse_inputs(record)
         item: dict[str, Any] = {
             "type": spec["type"],
-            "state": RequestParser.render_text(record["state"]),
-            "images": RequestParser.load_media(record.get("media", [])),
+            "state": state,
+            "images": images,
             "question": question,
             "target": target,
         }

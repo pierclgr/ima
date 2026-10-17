@@ -26,25 +26,69 @@ class RequestParser:
         return json.dumps(value, indent=2, ensure_ascii=False)
 
     @staticmethod
-    def load_media(media: list[dict[str, Any]]) -> list[Image.Image]:
-        """Loads the media items of a request.
+    def parse_inputs(request: dict[str, Any]) -> tuple[str, list[Image.Image]]:
+        """Reads native llama.cpp state and images without changing the request.
 
         Args:
-            media: Items `{"type": "image", "data": ...}`, where `data` is a
-                data URI, a URL, a path or a PIL image.
+            request: State, optional `files` and `images` arrays of image
+                data URLs. Dataset records can hold PIL images directly.
+                Image parts in a chat state are also accepted.
 
         Returns:
-            The images, in request order.
+            State text and images, in files, images, then chat order.
 
         Raises:
-            ValueError: If an item is not an image.
+            ValueError: If state is null, media use the old format, or an
+                input is not an image data URL. At most eight images.
         """
+        if "media" in request:
+            raise ValueError("media is removed; use files or images")
+        state: Any = request["state"]
+        if state is None:
+            raise ValueError("state must not be null")
+        if request.get("videos"):
+            raise ValueError("videos are not supported")
+        files: list[Any] = []
+        for key in ("files", "images"):
+            values: Any = request.get(key)
+            if values is not None:
+                if not isinstance(values, list):
+                    raise ValueError(f"{key} must be an array")
+                files.extend(values)
+        wrapped: bool = isinstance(state, dict) and "messages" in state
+        messages: Any = state["messages"] if wrapped else state
+        if isinstance(messages, list):
+            cleaned: list[Any] = []
+            for message in messages:
+                if not isinstance(message, dict) or not isinstance(
+                    message.get("content"), list
+                ):
+                    cleaned.append(message)
+                    continue
+                content: list[Any] = []
+                for part in message["content"]:
+                    if (
+                        isinstance(part, dict)
+                        and part.get("type") == "image_url"
+                    ):
+                        url: Any = part["image_url"]
+                        files.append(
+                            url["url"] if isinstance(url, dict) else url
+                        )
+                    else:
+                        content.append(part)
+                cleaned.append({**message, "content": content})
+            state = {**state, "messages": cleaned} if wrapped else cleaned
+        if len(files) > 8:
+            raise ValueError("at most 8 images are supported")
         images: list[Image.Image] = []
-        for item in media:
-            if item["type"] != "image":
-                raise ValueError(f"unsupported media type {item['type']!r}")
-            images.append(load_image(item["data"]))
-        return images
+        for value in files:
+            if not isinstance(value, Image.Image) and not (
+                isinstance(value, str) and value.startswith("data:image/")
+            ):
+                raise ValueError("files must be image data URLs")
+            images.append(load_image(value))
+        return RequestParser.render_text(state), images
 
     @staticmethod
     def build_question(spec: dict[str, Any]) -> Question:

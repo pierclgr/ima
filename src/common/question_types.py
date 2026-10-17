@@ -54,7 +54,7 @@ class ChoiceType(QuestionType):
         return {
             "type": "choice",
             "choice": question.options[best],
-            "confidence": (probabilities[best] - 1 / k) / (1 - 1 / k),
+            "confidence": max(0.0, (probabilities[best] - 1 / k) / (1 - 1 / k)),
             "probabilities": dict(zip(question.options, probabilities)),
         }
 
@@ -83,6 +83,8 @@ class ScoreType(QuestionType):
     """`score`: options are the levels, labels are level indices."""
 
     def build(self, text: str, criteria: Any) -> Question:
+        if not isinstance(criteria, list) or len(criteria) < 2:
+            raise ValueError("score criteria must be an array of at least 2 levels")
         return Question(text, list(criteria))
 
     def option_index(self, key: Any, question: Question) -> int:
@@ -96,9 +98,9 @@ class ScoreType(QuestionType):
     ) -> dict[str, Any]:
         k: int = len(probabilities)
         best: int = probabilities.index(max(probabilities))
-        # spread around the mode, relative to the uniform distribution
+        # llama.cpp: spread around the mode, uniform spread around the center
         spread: float = sum(p * abs(i - best) for i, p in enumerate(probabilities))
-        uniform: float = sum(abs(i - best) for i in range(k)) / k
+        uniform: float = sum(abs(i - (k - 1) / 2) for i in range(k)) / k
         return {
             "type": "score",
             "score": sum(i * p for i, p in enumerate(probabilities)),

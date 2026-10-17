@@ -1,0 +1,16 @@
+# one question per call; time excludes the first ten eligible questions
+backend: llamacpp
+model: exports/qwen3_5_0_8b_f16
+
+data:
+  dataset: datasets
+  split: test
+
+testing:
+  output_dir: runs/qwen3_5_0_8b/llamacpp/f16/test
+  per_device_eval_batch_size: 1
+
+llamacpp:
+  llama_cpp_dir: ~/llama.cpp
+  ctx_size: 8192
+  gpu_layers: -1
