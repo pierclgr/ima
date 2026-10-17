@@ -308,3 +308,14 @@ runs on the full test sets.
 - One GPU only, no multi-GPU training yet.
 - Images only, no video.
 - Each question of a request is a separate forward pass (no shared KV cache).
+
+## License
+
+The original source code in this repository is licensed under the
+[Apache License 2.0](LICENSE).
+
+Datasets and model weights, including trained adapters and checkpoints, are
+excluded from this code license and require separate license terms. The
+`Jacqkues/kev-vision-decisions-full` dataset requires non-commercial research
+use and compliance with each source's license; see its
+[dataset card](https://huggingface.co/datasets/Jacqkues/kev-vision-decisions-full).
