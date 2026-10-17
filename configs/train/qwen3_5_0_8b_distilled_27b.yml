@@ -29,7 +29,7 @@ distillation:
 # lower learning rate than the baseline: the adapter is already trained
 training:
   output_dir: runs/qwen3_5_0_8b_distilled
-  num_epochs: 1
+  num_epochs: 3
   learning_rate: 5e-5
   # change the question order while keeping the calibration split
   data_seed: 43
