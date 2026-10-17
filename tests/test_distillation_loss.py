@@ -28,8 +28,11 @@ def test_loss_matches_formula(alpha: float, temperature: float) -> None:
         expected.append(alpha * -(y * torch.log_softmax(z, -1)).sum()
                         + (1 - alpha) * temperature**2 * kl)
     settings = DistillationSettings("t", "s", alpha, temperature)
-    loss = distillation_loss(logits, labels, teacher, mask, settings)
+    loss, ce_term, kl_term = distillation_loss(
+        logits, labels, teacher, mask, settings,
+    )
     torch.testing.assert_close(loss, torch.stack(expected).mean())
+    torch.testing.assert_close(loss, ce_term + kl_term)
     loss.backward()
     assert torch.isfinite(loss)
     assert logits.grad[0, 2] == 0
@@ -37,7 +40,7 @@ def test_loss_matches_formula(alpha: float, temperature: float) -> None:
 
 
 def test_loss_handles_mixed_precision() -> None:
-    loss = distillation_loss(
+    loss, _, _ = distillation_loss(
         torch.tensor([[2.0, -1.0]], dtype=torch.bfloat16),
         torch.tensor([[1.0, 0]]), torch.tensor([[0.7, 0.3]]),
         torch.ones(1, 2, dtype=torch.bool), DistillationSettings("t", "s"),
@@ -112,3 +115,36 @@ def test_accumulation_scales_once(tmp_path: Path) -> None:
             })
         gradients.append(model.logits.grad)
     torch.testing.assert_close(*gradients)
+
+
+def test_log_adds_the_loss_parts_of_the_training_steps(tmp_path: Path) -> None:
+    model = LogitModel()
+    trainer = DistillationTrainer(
+        model=model, args=TrainingArguments(output_dir=str(tmp_path),
+                                           use_cpu=True, report_to="none"),
+        distillation=DistillationSettings("t", "s", alpha=0.4),
+    )
+    inputs = {
+        "input_ids": torch.ones(2, 1, dtype=torch.long),
+        "labels": torch.tensor([[1.0, 0], [0, 1.0]]),
+        "teacher_targets": torch.tensor([[0.2, 0.8], [0.1, 0.9]]),
+        "option_mask": torch.ones(2, 2, dtype=torch.bool), "num_options": 2,
+    }
+    model.train()
+    loss = trainer.compute_loss(model, inputs)
+    trainer.compute_loss(model, inputs)
+    logs = {"loss": loss.item()}
+    trainer.log(logs)
+    assert logs["loss_ce"] + logs["loss_kl"] == pytest.approx(logs["loss"])
+    assert logs["loss_ce"] > 0 and logs["loss_kl"] > 0
+    # the parts restart after each log and evaluation logs are untouched
+    trainer.compute_loss(model, inputs)
+    trainer.log({"loss": loss.item()})
+    eval_logs = {"eval_loss": 1.0}
+    trainer.log(eval_logs)
+    assert "loss_ce" not in eval_logs
+    model.eval()
+    trainer.compute_loss(model, inputs)
+    later = {"loss": 1.0}
+    trainer.log(later)
+    assert "loss_ce" not in later

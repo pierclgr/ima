@@ -18,9 +18,11 @@ def distillation_loss(
     teacher_targets: torch.Tensor,
     option_mask: torch.Tensor,
     settings: DistillationSettings,
-) -> torch.Tensor:
-    """Returns mean human CE plus T-squared forward KL over real options.
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Returns the loss and its two weighted terms (loss = CE term + KL term).
 
+    The terms are alpha times the mean human CE and (1 - alpha) times the
+    T-squared forward KL over real options.
     Teacher probabilities include the teacher's fitted calibration already.
     Student calibration is excluded: both terms use raw student logits.
     """
@@ -29,7 +31,7 @@ def distillation_loss(
     logits = logits.masked_fill(~option_mask, minimum)
     ce = F.cross_entropy(logits, labels.float())
     if settings.alpha == 1:
-        return ce
+        return ce, ce, torch.zeros_like(ce)
     temperature = settings.temperature
     # log-space softening avoids underflow when T is small
     teacher = teacher_targets.float().masked_fill(~option_mask, 0)
@@ -39,7 +41,9 @@ def distillation_loss(
         (logits / temperature).masked_fill(~option_mask, minimum), dim=-1,
     )
     kl = F.kl_div(log_student, softened, reduction="batchmean")
-    return settings.alpha * ce + (1 - settings.alpha) * temperature**2 * kl
+    ce_term = settings.alpha * ce
+    kl_term = (1 - settings.alpha) * temperature**2 * kl
+    return ce_term + kl_term, ce_term, kl_term
 
 
 class DistillationCollator:
@@ -69,12 +73,18 @@ class DistillationCollator:
 
 
 class DistillationTrainer(Trainer):
-    """Uses cached targets during training and human CE during evaluation."""
+    """Uses cached targets during training and human CE during evaluation.
+
+    Training logs also hold `loss_ce` and `loss_kl`, the two weighted terms
+    of `loss` (their sum), averaged over the steps since the last log.
+    """
 
     def __init__(self, *args: Any, distillation: DistillationSettings,
                  **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.distillation = distillation
+        self.terms: torch.Tensor | None = None
+        self.term_steps: int = 0
         # soft-label elements are options, not the question count
         self.model_accepts_loss_kwargs = False
 
@@ -89,9 +99,25 @@ class DistillationTrainer(Trainer):
         if model.training and teacher is None:
             raise ValueError("distillation training requires teacher targets")
         outputs = model(**inputs)
-        loss = (
-            distillation_loss(outputs.logits, inputs["labels"], teacher,
-                              inputs["option_mask"], self.distillation)
-            if model.training else outputs.loss
-        )
+        if model.training:
+            loss, ce_term, kl_term = distillation_loss(
+                outputs.logits, inputs["labels"], teacher,
+                inputs["option_mask"], self.distillation,
+            )
+            terms = torch.stack([ce_term, kl_term]).detach()
+            self.terms = terms if self.terms is None else self.terms + terms
+            self.term_steps += 1
+        else:
+            loss = outputs.loss
         return (loss, outputs) if return_outputs else loss
+
+    def log(
+        self, logs: dict[str, float], start_time: float | None = None,
+    ) -> None:
+        """Adds the loss terms to a training log and restarts their average."""
+        if "loss" in logs and self.terms is not None:
+            logs["loss_ce"], logs["loss_kl"] = (
+                self.terms / self.term_steps
+            ).tolist()
+            self.terms, self.term_steps = None, 0
+        super().log(logs, start_time)
