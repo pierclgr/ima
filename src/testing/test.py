@@ -17,6 +17,7 @@ batches than that. With `backend: llamacpp`, `model` is a GGUF export
 directory, each call holds one question, and native timing includes vision
 encoding, projection and language inference. Data preparation and IPC are
 excluded. Reports also include the backend, device, and question counts.
+GGUF startup status and question progress go to stderr, outside native timing.
 
 Usage:
     uv run python -m src.testing.test configs/test/<run>.yml \\
@@ -90,12 +91,23 @@ def main(argv: list[str] | None = None) -> None:
     if not argv:
         raise SystemExit(__doc__)
     config = TestConfig.from_yaml(argv[0], argv[1:])
+    if config.backend == "llamacpp":
+        print(
+            f"Loading dataset {config.data.dataset} "
+            f"(split: {config.data.split})...",
+            file=sys.stderr, flush=True,
+        )
     records = HubRecordLoader(config.data.dataset).load(config.data.split)
     if config.data.sample is not None:
         records = records.shuffle(seed=SAMPLE_SEED).select(range(config.data.sample))
     if config.backend == "llamacpp":
+        print(f"Loaded {len(records)} records.", file=sys.stderr, flush=True)
         runtime = LlamaCppRuntime(config.model, config.llamacpp)
         try:
+            print(
+                f"Model ready on {runtime.device}.",
+                file=sys.stderr, flush=True,
+            )
             evaluator = LlamaCppEvaluator(runtime, config.temperature)
             output = evaluator.predict(records)
             times = evaluator.times

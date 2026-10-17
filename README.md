@@ -167,6 +167,20 @@ uv run python -m src.training.train configs/train/qwen3_5_0_8b.yml --training.le
   loss and seconds per question. System Two also reports the share of
   outputs with no valid answer.
 
+### Code tests
+
+Run the regression suite with `uv run pytest`. Tests use tiny local models,
+fake processors, and temporary output directories; they need no downloads
+or cloud jobs. Keep test source in tracked `tests/` and benchmark results
+in ignored `runs/`.
+
+Native llama.cpp integration checks are optional. Set `LLAMA_CPP_DIR` to
+a built checkout and `IMA_TEST_EXPORTS` to the directory containing the
+`qwen3_5_0_8b_f16`, `qwen3_5_0_8b_q8`, and `qwen3_5_0_8b_q4` exports
+to enable them. They use CPU inference and local model files.
+For actual GGUF conversion checks, also set `IMA_TEST_MODEL` to a local
+merged System One checkpoint. Exports are written to temporary directories.
+
 ### Test local GGUF models
 
 Use the same test command with the GGUF config. It loads the model once
@@ -178,6 +192,12 @@ already have shared libraries (`BUILD_SHARED_LIBS=ON`, the default).
 ```bash
 uv run python -m src.testing.test configs/test/qwen3_5_0_8b_llamacpp.yml
 ```
+
+Status messages show dataset loading, worker setup, model loading, and the
+ready device. An inference progress bar shows completed/total questions,
+elapsed time, and estimated time remaining. This uses total elapsed time;
+the reported `test_seconds_per_question` still uses only native model time.
+Progress output goes to stderr; the final metrics remain JSON on stdout.
 
 The config uses `~/llama.cpp`, Metal/CUDA when available, and the local
 Parquet files in `datasets/test/` and `datasets/test_ood/`. Set

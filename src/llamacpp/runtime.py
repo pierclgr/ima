@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,8 @@ def build_worker(checkout: Path) -> Path:
 class LlamaCppRuntime:
     """Loads one GGUF export and exchanges untimed JSON with a C++ worker.
 
+    Prints worker setup and model loading status to stderr.
+
     Args:
         model: Export directory containing one `model-*.gguf`.
         settings: Native context and device settings.
@@ -58,8 +61,10 @@ class LlamaCppRuntime:
         if len(models) != 1:
             raise ValueError("model must contain exactly one model-*.gguf")
         checkout = Path(settings.llama_cpp_dir).expanduser().resolve()
+        print("Preparing llama.cpp worker...", file=sys.stderr, flush=True)
         binary = build_worker(checkout)
         projector = directory / "mmproj-F16.gguf"
+        print(f"Loading GGUF model {models[0]}...", file=sys.stderr, flush=True)
         self.log = tempfile.TemporaryFile(mode="w+t")
         self.process = subprocess.Popen(
             [str(binary), str(models[0]),

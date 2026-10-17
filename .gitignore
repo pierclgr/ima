@@ -8,4 +8,4 @@ weights/
 datasets/
 exports/
 .cache/
-tests/
+runs/

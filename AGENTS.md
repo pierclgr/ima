@@ -99,6 +99,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - `configs/calibration/`: standalone calibration configs (YAML)
 - `configs/test/`: test run configs (YAML)
 - `configs/distillation/`: soft label caching configs (`data`, `distillation`)
+- `tests/`: tracked regression tests; no model downloads or cloud jobs
 - `docs/`: documentation
 - `assets/`: images (e.g. the results graph used by `README.md`)
 - `README.md`: project overview (install, usage, configs, results)
@@ -126,6 +127,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
   `model`, one question per call, and local Parquet or Hub data. Native
   inference seconds exclude preparation and IPC; the first ten questions
   count in accuracy but not timing. GGUF testing does not use HF arguments
+  and shows startup status and question progress on stderr
 - `uv run python -m src.modal.cache configs/train/<run>.yml`: download
   the backbone and dataset of a config
 - `uv run python -m src.modal.cache
@@ -177,5 +179,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - File names: `snake_case.py`; Markdown: `UPPER_SNAKE_CASE.md`
 - Markdown: max 80 chars per line
 - Structure: `src/` code, `tests/` tests, `docs/` documentation
+- Keep test source tracked; benchmark outputs belong in ignored `runs/`
+- Native integration tests opt in with `LLAMA_CPP_DIR` and `IMA_TEST_EXPORTS`
 - Git: branches `feature/snake_case`, `fix/snake_case`; commit messages in
   past tense, one short sentence, name the files affected

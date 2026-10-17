@@ -1,7 +1,9 @@
+import sys
 from typing import Any
 
 import numpy as np
 import torch
+from tqdm import tqdm
 from transformers import EvalPrediction
 from transformers.trainer_utils import PredictionOutput
 
@@ -31,7 +33,8 @@ class LlamaCppEvaluator:
         self.times: list[float] = []
 
     def predict(self, records: Any) -> PredictionOutput:
-        """Returns prediction arrays and metrics in the HF test format."""
+        """Returns HF-format predictions and metrics, with progress on stderr."""
+        print("Preparing evaluation questions...", file=sys.stderr, flush=True)
         dataset = DecisionEngineDataset(records, shuffle_options=False)
         if not len(dataset):
             raise ValueError("no eligible questions to evaluate")
@@ -43,7 +46,9 @@ class LlamaCppEvaluator:
         labels = np.zeros(shape, dtype=np.float32)
         losses: list[float] = []
         self.times = []
-        for i in range(len(dataset)):
+        for i in tqdm(
+            range(len(dataset)), desc="Running inference", unit="question",
+        ):
             item = dataset[i]
             result = self.runtime.predict(item)
             count = len(item["target"])
