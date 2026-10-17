@@ -121,18 +121,15 @@ You can also build them first with the cache task and a distillation config:
 # optional: cache the teacher option probabilities (soft labels)
 uv run python -m src.modal.cache configs/distillation/qwen3_8_27b.yml
 
-# build missing soft labels, then train a new LoRA on the fine-tuned student
-uv run python -m src.training.train configs/train/qwen3_5_0_8b_distilled.yml
-
-# control: the same student and extra epoch, using human targets only
-uv run python -m src.training.train configs/train/qwen3_5_0_8b_control.yml
+# build missing soft labels, then continue the fine-tuned student's LoRA
+uv run python -m src.training.train configs/train/qwen3_5_0_8b_distilled_27b.yml
 ```
 
 The teacher reads `runs/qwen3_8_27b/final` and uses its saved calibration.
-The student is the config's `backbone`, `runs/qwen3_5_0_8b/final`. Both can
-also be raw HF backbones (e.g. `Qwen/Qwen3.5-0.8B`), as in training; a raw
-teacher has temperature 1 (no calibration). Fine-tuned model directories must
-include their processors. Generation saves only soft labels and metadata
+The student loads the config's `backbone` and its trained LoRA from
+`adapter`. Both models can use raw HF backbones (e.g. `Qwen/Qwen3.5-0.8B`).
+A raw teacher has temperature 1 (no calibration). Fine-tuned model directories
+must include their processors. Generation saves only soft labels and metadata
 under `datasets/qwen3_8_27b/soft_labels`; images stay in the original HF
 dataset. The `distillation` section sets `teacher`, `soft_labels` (the cache
 directory), `alpha`, `temperature` and `generating` (the teacher's prediction
@@ -150,9 +147,8 @@ their options. The teacher is released before student training starts.
 
 Validation and final calibration use human targets. The calibration split
 is carved out before training with the original seed and fraction, so the
-fine-tuned student's held-out records remain held out. The student and
-control have matched settings and separate output directories. Their
-merged models are saved under their run's `final/`.
+fine-tuned student's held-out records remain held out. Merged student
+models are saved under their run's `final/`.
 
 Run the same commands on either cloud with the tasks `cache` (distillation
 config) and `train` (training config):
@@ -161,12 +157,12 @@ config) and `train` (training config):
 uv run python -m src.runpod.app --task cache \
     --config configs/distillation/qwen3_8_27b.yml --gpu "NVIDIA H200"
 uv run python -m src.runpod.app --task train \
-    --config configs/train/qwen3_5_0_8b_distilled.yml
+    --config configs/train/qwen3_5_0_8b_distilled_27b.yml
 
 modal run src/modal/app.py --task cache \
     --config configs/distillation/qwen3_8_27b.yml --gpu H200
 modal run --detach src/modal/app.py --task train \
-    --config configs/train/qwen3_5_0_8b_distilled.yml
+    --config configs/train/qwen3_5_0_8b_distilled_27b.yml
 ```
 
 Place both fine-tuned models on that cloud's persistent `runs` volume. The
@@ -175,11 +171,11 @@ Regular model/dataset caching uses CPU; caching teacher soft labels uses GPU.
 Both use the same Modal cache function with different resource options.
 If `train` must build soft labels, its GPU must fit the teacher too. Pre-cache
 on a larger GPU to train the student on a smaller GPU afterward.
-Resume the student's new adapter with
+Resume the student's adapter with
 `--checkpoint runs/qwen3_5_0_8b_distilled/checkpoint-<step>`, keeping the
-original fine-tuned `backbone` and cache unchanged.
+original `backbone` and cache unchanged.
 
-Test the baseline, control, and distilled model on `test` and `test_ood`.
+Test the baseline and distilled models on `test` and `test_ood`.
 Use the existing test config with `--model`, `--data.split`, and a distinct
 `--testing.output_dir` per run. Compare accuracy, Brier, ECE, and latency
 on matching hardware. No benchmark gain is assumed before these runs.
@@ -273,15 +269,23 @@ On `Jacqkues/kev-vision-decisions-full`:
 | Qwen3.5-0.8B | zero-shot | System Two | `test` | 49.7% | 0.623 | 0.266 | 2.156 |
 | Qwen3.5-0.8B | zero-shot | System One | `test` | 52.1% | 0.512 | 0.100 | 0.078 |
 | Qwen3.5-0.8B | fine-tuned | System One | `test` | 75.4% | 0.262 | 0.031 | 0.083 |
+| Qwen3.5-0.8b-distil-Qwen3.8-27b | distilled (base student) | System One | `test` | 76.9% | 0.259 | 0.042 | 0.081 |
+| Qwen3.5-0.8b-distil-Qwen3.8-27b | distilled (fine-tuned student) | System One | `test` | 77.9% | 0.255 | 0.059 | 0.077 |
 | Qwen3.8-27B | zero-shot | System Two | `test` | 62.9% | 0.497 | 0.232 | 4.857 |
 | Qwen3.8-27B | zero-shot | System One | `test` | 65.2% | 0.427 | 0.122 | 0.129 |
 | Qwen3.8-27B | fine-tuned | System One | `test` | 79.2% | 0.218 | 0.037 | 0.194 |
 | Qwen3.5-0.8B | zero-shot | System Two | `test_ood` | 60.4% | 0.477 | 0.143 | 2.293 |
 | Qwen3.5-0.8B | zero-shot | System One | `test_ood` | 58.6% | 0.505 | 0.049 | 0.088 |
 | Qwen3.5-0.8B | fine-tuned | System One | `test_ood` | 68.3% | 0.414 | 0.031 | 0.070 |
+| Qwen3.5-0.8b-distil-Qwen3.8-27b | distilled (base student) | System One | `test_ood` | 67.9% | 0.399 | 0.028 | 0.090 |
+| Qwen3.5-0.8b-distil-Qwen3.8-27b | distilled (fine-tuned student) | System One | `test_ood` | 70.3% | 0.415 | 0.083 | 0.063 |
 | Qwen3.8-27B | zero-shot | System Two | `test_ood` | 82.2% | 0.212 | 0.075 | 3.977 |
 | Qwen3.8-27B | zero-shot | System One | `test_ood` | 74.5% | 0.338 | 0.046 | 0.147 |
 | Qwen3.8-27B | fine-tuned | System One | `test_ood` | 89.4% | 0.158 | 0.015 | 0.157 |
+
+Both distilled models use the fine-tuned Qwen3.8-27B teacher. The labels
+refer to the student's starting weights: the pretrained base model or an
+adapter already fine-tuned on the task.
 
 `test_ood` holds sources not seen in training.
 
