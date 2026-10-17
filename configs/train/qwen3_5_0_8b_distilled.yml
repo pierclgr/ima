@@ -30,7 +30,9 @@ distillation:
 training:
   output_dir: runs/qwen3_5_0_8b_distilled
   num_epochs: 1
-  learning_rate: 2e-4
+  learning_rate: 5e-5
+  # change the question order while keeping the calibration split
+  data_seed: 43
   lr_scheduler_type: cosine
   warmup_steps: 0.1
   per_device_train_batch_size: 256
@@ -39,7 +41,9 @@ training:
   bf16: true
   gradient_checkpointing: true
   dataloader_num_workers: 4
-  eval_strategy: epoch
+  eval_strategy: steps
+  eval_steps: 30
+  eval_on_start: true
   save_strategy: steps
   save_steps: 15
   save_total_limit: 2
