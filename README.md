@@ -418,6 +418,33 @@ Accuracy against time per question, one graph per test set:
 
 ![Accuracy vs seconds per question on test_ood](assets/accuracy_vs_time_test_ood.png)
 
+### Quantization (llama.cpp)
+
+Measured locally on Apple M3 Pro (Metal + CPU). Accuracy includes all
+evaluated questions; mean seconds per question is native model time after
+the first 10 warm-up questions. `test` evaluated 4,855 questions and skipped
+64 choice questions with more than 26 options. `test_ood` evaluated all
+1,477 questions.
+
+| Model | Quant. | Split | Accuracy | Brier | ECE | s/question |
+|---|---|---|---:|---:|---:|---:|
+| Fine-tuned | F16 | `test` | 74.3% | 0.262 | 0.020 | 0.119 |
+| Fine-tuned | F16 | `test_ood` | 67.4% | 0.414 | 0.049 | 0.122 |
+| Fine-tuned | Q8_0 | `test` | 75.0% | 0.262 | 0.026 | 0.114 |
+| Fine-tuned | Q8_0 | `test_ood` | 67.3% | 0.414 | 0.050 | 0.114 |
+| Fine-tuned | Q4_K_M | `test` | 74.7% | 0.264 | 0.025 | 0.114 |
+| Fine-tuned | Q4_K_M | `test_ood` | 68.2% | 0.415 | 0.029 | 0.115 |
+| distilled (fine-tuned student) | F16 | `test` | 75.4% | 0.254 | 0.041 | 0.115 |
+| distilled (fine-tuned student) | F16 | `test_ood` | 71.0% | 0.411 | 0.078 | 0.117 |
+| distilled (fine-tuned student) | Q8_0 | `test` | 77.7% | 0.254 | 0.057 | 0.112 |
+| distilled (fine-tuned student) | Q8_0 | `test_ood` | 71.0% | 0.412 | 0.078 | 0.113 |
+| distilled (fine-tuned student) | Q4_K_M | `test` | 78.8% | 0.255 | 0.070 | 0.113 |
+| distilled (fine-tuned student) | Q4_K_M | `test_ood` | 71.2% | 0.418 | 0.084 | 0.114 |
+
+![Quantization on test](assets/quantization_accuracy_vs_time_test.png)
+
+![Quantization on test_ood](assets/quantization_accuracy_vs_time_test_ood.png)
+
 ## Limits
 - Max 26 options per question.
 - One GPU only, no multi-GPU training yet.
