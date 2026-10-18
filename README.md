@@ -134,6 +134,18 @@ See [docs/LLAMACPP.md](docs/LLAMACPP.md) for the export contract and checks,
 and the [native API documentation](https://github.com/ggml-org/llama.cpp/blob/c0fd78626405c6d9b934efef0ec7291fcc20e3d6/tools/server/README.md)
 for the complete request and response format.
 
+### Snake demo
+
+A browser Snake game played by the System One server from screenshots, on a
+fixed game clock. Start the server above, then:
+
+```bash
+python examples/snake/server.py
+```
+
+Open <http://127.0.0.1:8081/>. See
+[examples/snake/README.md](examples/snake/README.md).
+
 ### Train, calibrate, test
 Each task reads a YAML config. You can change any value from the command
 line with `--key value` or `--section.key value`.

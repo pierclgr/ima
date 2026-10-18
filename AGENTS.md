@@ -95,6 +95,12 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
       TensorBoard for `train`) and deletes itself; network volume at
       `/workspace` with `models`, `datasets`, `runs`, `uv`; REST API v2
       with `urllib`
+- `examples/snake/`: screenshot Snake demo (dependency-free)
+  - `server.py`: standard-library static server on `127.0.0.1:8081`
+  - `js/`: ES modules: `game.js` (seeded rules, next cells, safe moves),
+    `request.js` (request from the context items chosen in the UI, answer
+    parsing), `controller.js` (fixed clock, one request in flight, one
+    answer waiting), `metrics.js`, `render.js`, `app.js` (UI)
 - `configs/train/`: training run configs (YAML)
 - `configs/calibration/`: standalone calibration configs (YAML)
 - `configs/test/`: test run configs (YAML)
@@ -115,6 +121,10 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - `python -m src.llamacpp.serve EXPORT --llama-cpp-dir CHECKOUT
   [--host HOST] [--port PORT] [--ctx-size N] [--gpu-layers N]
   [--api-key KEY]`: start the native System One API
+- `python examples/snake/server.py`: serve the Snake demo; it calls a
+  separately started llama-server API from the browser
+- `node --test 'tests/snake/*.test.mjs'`: run the Snake demo tests (Node's
+  built-in runner, no packages)
 - `uv run python -m src.training.train configs/train/<run>.yml
   [--section.key value]`: train (the gated dataset needs `hf auth login`)
 - `uv run python -m src.calibration.calibrate configs/calibration/<run>.yml
