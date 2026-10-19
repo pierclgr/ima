@@ -5,6 +5,12 @@ export const DIRECTIONS = ['up', 'down', 'left', 'right'];
 
 const MOVES = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 export const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
+// recent head positions kept for the loop risk, cleared when the snake eats
+const RECENT = 12;
+
+const same = (a, b) => a.x === b.x && a.y === b.y;
+const inside = (cell) => cell.x >= 0 && cell.y >= 0 && cell.x < SIZE && cell.y < SIZE;
+const manhattan = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
 /**
  * Makes a repeatable random generator (mulberry32).
@@ -27,8 +33,9 @@ export class SnakeGame {
   /** @param {number} seed integer seed */
   constructor(seed) {
     this.random = seededRandom(seed);
-    this.snake = [{ x: 4, y: 5 }, { x: 3, y: 5 }, { x: 2, y: 5 }];
+    this.snake = [{ x: 4, y: 5 }, { x: 3, y: 5 }];
     this.heading = 'right';
+    this.recentHeads = [];
     this.tick = 0;
     this.score = 0;
     this.over = false;
@@ -69,7 +76,9 @@ export class SnakeGame {
       this.end('body');
     } else {
       this.snake = [head, ...body];
+      this.recentHeads = [...this.recentHeads, head].slice(-RECENT);
       if (eats) {
+        this.recentHeads = [];
         this.score += 1;
         this.food = this.placeFood();
         if (!this.food) this.end('board full');
@@ -89,10 +98,9 @@ export class SnakeGame {
       DIRECTIONS.filter((direction) => direction !== OPPOSITE[this.heading]).map((direction) => {
         const [dx, dy] = MOVES[direction];
         const cell = { x: this.snake[0].x + dx, y: this.snake[0].y + dy };
-        const same = (other) => other.x === cell.x && other.y === cell.y;
-        if (cell.x < 0 || cell.y < 0 || cell.x >= SIZE || cell.y >= SIZE) return [direction, 'wall'];
-        if (this.food && same(this.food)) return [direction, 'food'];
-        return [direction, body.some(same) ? 'body' : 'empty'];
+        if (!inside(cell)) return [direction, 'wall'];
+        if (this.food && same(this.food, cell)) return [direction, 'food'];
+        return [direction, body.some((part) => same(part, cell)) ? 'body' : 'empty'];
       }),
     );
   }
@@ -105,6 +113,50 @@ export class SnakeGame {
     return Object.entries(this.nextCells())
       .filter(([, content]) => content === 'empty' || content === 'food')
       .map(([direction]) => direction);
+  }
+
+  /**
+   * Computes the per-option facts of a safe move, as Decisio does.
+   * @param {string} direction a direction from `safeMoves`
+   * @returns {{next: {x: number, y: number}, eats: boolean,
+   *   distanceBefore: number, distanceAfter: number,
+   *   progress: 'closer' | 'farther' | 'eats', exits: string[],
+   *   reachable: number, visits: number, loopRisk: 'low' | 'medium' | 'high'}}
+   *   distances are Manhattan distances to the food (obstacles ignored);
+   *   exits and reachable cells use the body after the move
+   */
+  moveFacts(direction) {
+    const [dx, dy] = MOVES[direction];
+    const next = { x: this.snake[0].x + dx, y: this.snake[0].y + dy };
+    const eats = same(next, this.food);
+    const body = [next, ...(eats ? this.snake : this.snake.slice(0, -1))];
+    const distanceBefore = manhattan(this.snake[0], this.food);
+    const distanceAfter = manhattan(next, this.food);
+    // one step always changes the distance by 1, so it is never the same
+    let progress = distanceAfter < distanceBefore ? 'closer' : 'farther';
+    if (eats) progress = 'eats';
+    // the next move frees the tail cell, so it is a valid exit
+    const blocking = body.slice(0, -1);
+    const exits = DIRECTIONS.filter((exit) => exit !== OPPOSITE[direction]).filter((exit) => {
+      const [ex, ey] = MOVES[exit];
+      const cell = { x: next.x + ex, y: next.y + ey };
+      return inside(cell) && !blocking.some((part) => same(part, cell));
+    });
+    // flood fill from the new head, with the body kept where it is
+    const seen = [next];
+    for (let index = 0; index < seen.length; index += 1) {
+      for (const [mx, my] of Object.values(MOVES)) {
+        const cell = { x: seen[index].x + mx, y: seen[index].y + my };
+        if (inside(cell) && !body.some((part) => same(part, cell)) && !seen.some((other) => same(other, cell))) {
+          seen.push(cell);
+        }
+      }
+    }
+    const visits = this.recentHeads.filter((head) => same(head, next)).length;
+    const loopRisk = visits >= 2 ? 'high' : visits === 1 ? 'medium' : 'low';
+    return {
+      next, eats, distanceBefore, distanceAfter, progress, exits, reachable: seen.length - 1, visits, loopRisk,
+    };
   }
 
   /** @param {string} reason why the game ended */

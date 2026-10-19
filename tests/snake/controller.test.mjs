@@ -240,7 +240,7 @@ test('without the safety net deadly options are sent and no code moves', async (
 
 test('game over stops the clock and saves a results row', async () => {
   const { clock, calls, controller } = setup();
-  controller.reset(300, 9, { ...DEFAULT_CONTEXT, screenshot: false, board: true });
+  controller.reset(300, 9, { ...DEFAULT_CONTEXT, screenshot: false, board: true, progress: true });
   controller.game.food = { x: 0, y: 0 };
   controller.play();
   calls[0].resolve(reply('right'));
@@ -251,9 +251,9 @@ test('game over stops the clock and saves a results row', async () => {
   assert.equal(controller.results.length, 1);
   const row = controller.results[0];
   assert.equal(calls[0].body.files, undefined);
-  assert.match(calls[0].body.state, /\. \. B B H/);
+  assert.match(calls[0].body.state, /\| \. \. \. # H/);
   assert.equal(controller.log.length > 0 && 'board' in controller.decision, true);
-  assert.equal(row.context, 'board+head+food+direction+cells+safety');
+  assert.equal(row.context, 'board+head+food+direction+cells+safety+progress');
   assert.equal(row.seed, 9);
   assert.equal(row.tick_ms, 300);
   assert.equal(row.ticks, 6);

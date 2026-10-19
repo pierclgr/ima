@@ -3,7 +3,7 @@
 import { SnakeGame } from './game.js';
 import { mean, median, RunMetrics } from './metrics.js';
 import {
-  boardText, buildRequest, CONTEXT_ITEMS, DEFAULT_CONTEXT, options, parseAnswer,
+  boardText, buildRequest, CONTEXT_ITEMS, DEFAULT_CONTEXT, OPTION_FACTS, options, parseAnswer,
 } from './request.js';
 
 /** Runs games on a fixed tick and applies the newest model answer. */
@@ -38,7 +38,7 @@ export class DemoController {
    * @param {number} tickMs fixed tick interval of the game
    * @param {number} seed board seed
    * @param {Object<string, boolean>} context items sent to the model
-   *   (`CONTEXT_ITEMS`)
+   *   (`CONTEXT_ITEMS` and `OPTION_FACTS`)
    */
   reset(tickMs, seed, context) {
     this.stop();
@@ -168,7 +168,7 @@ export class DemoController {
   summary() {
     const { metrics, game } = this;
     return {
-      context: CONTEXT_ITEMS.filter((item) => this.context[item]).join('+') || 'none',
+      context: [...CONTEXT_ITEMS, ...OPTION_FACTS].filter((item) => this.context[item]).join('+') || 'none',
       seed: this.seed,
       tick_ms: this.tickMs,
       score: game.score,

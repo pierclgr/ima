@@ -10,10 +10,14 @@ function gameWithFood(food = { x: 9, y: 0 }) {
   return game;
 }
 
+test('the snake starts with a head and one body square', () => {
+  assert.deepEqual(new SnakeGame(1).snake, [{ x: 4, y: 5 }, { x: 3, y: 5 }]);
+});
+
 test('moves one cell per tick and keeps the heading without a direction', () => {
   const game = gameWithFood();
   game.step(null);
-  assert.deepEqual(game.snake, [{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }]);
+  assert.deepEqual(game.snake, [{ x: 5, y: 5 }, { x: 4, y: 5 }]);
   game.step('up');
   assert.deepEqual(game.snake[0], { x: 5, y: 4 });
   assert.equal(game.heading, 'up');
@@ -24,7 +28,7 @@ test('eating food grows the snake, adds a point and places new food', () => {
   const game = gameWithFood({ x: 5, y: 5 });
   game.step(null);
   assert.equal(game.score, 1);
-  assert.equal(game.snake.length, 4);
+  assert.equal(game.snake.length, 3);
   assert.ok(!game.snake.some((cell) => cell.x === game.food.x && cell.y === game.food.y));
 });
 
@@ -88,6 +92,44 @@ test('the tail cell counts as empty because the tail moves away', () => {
   game.snake = [{ x: 4, y: 5 }, { x: 4, y: 4 }, { x: 3, y: 4 }, { x: 3, y: 5 }];
   game.heading = 'down';
   assert.equal(game.nextCells().left, 'empty');
+});
+
+test('move facts give food progress, distances, exits and free squares', () => {
+  const game = gameWithFood({ x: 0, y: 5 });
+  game.snake = [{ x: 4, y: 4 }, { x: 4, y: 5 }, { x: 3, y: 5 }, { x: 3, y: 4 }, { x: 3, y: 3 }];
+  game.heading = 'up';
+  const right = game.moveFacts('right');
+  assert.deepEqual(right.next, { x: 5, y: 4 });
+  assert.equal(right.eats, false);
+  assert.deepEqual([right.distanceBefore, right.distanceAfter, right.progress], [5, 6, 'farther']);
+  assert.deepEqual(right.exits, ['up', 'down', 'right']);
+  // the body after the move holds 5 squares; every other square is reachable
+  assert.equal(right.reachable, 100 - 5);
+  assert.equal(game.moveFacts('up').progress, 'farther');
+  game.food = { x: 9, y: 0 };
+  assert.equal(game.moveFacts('up').progress, 'closer');
+  game.food = { x: 4, y: 3 };
+  assert.equal(game.moveFacts('up').progress, 'eats');
+});
+
+test('exits count the tail square as free, not the rest of the body', () => {
+  const game = gameWithFood();
+  game.snake = [{ x: 1, y: 1 }, { x: 1, y: 2 }, { x: 0, y: 2 }, { x: 0, y: 1 }, { x: 0, y: 0 }];
+  game.heading = 'up';
+  // after moving up to (1, 0), the tail (0, 0) moves on, so left is free
+  assert.deepEqual(game.moveFacts('up').exits, ['left', 'right']);
+});
+
+test('loop risk counts recent visits and resets when the snake eats', () => {
+  const game = gameWithFood({ x: 9, y: 9 });
+  for (const direction of ['up', 'left', 'down', 'right']) game.step(direction);
+  // the head is back at (4, 5) and turns up again: (4, 4) was visited once
+  assert.deepEqual([game.moveFacts('up').visits, game.moveFacts('up').loopRisk], [1, 'medium']);
+  for (const direction of ['up', 'left', 'down', 'right']) game.step(direction);
+  assert.equal(game.moveFacts('up').loopRisk, 'high');
+  game.food = { x: 4, y: 4 };
+  game.step('up');
+  assert.deepEqual(game.recentHeads, []);
 });
 
 test('the same seed gives the same board and food sequence', () => {

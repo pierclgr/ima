@@ -66,12 +66,12 @@ input:disabled { opacity: 0.6; }
 .status.bad { color: var(--bad); background: #fbeaea; }
 .error { color: var(--bad); }
 
-#context {
+.toggles {
   display: flex; flex-wrap: wrap; gap: 8px;
   margin: 16px 0 0; padding: 0; border: 0;
 }
-#context legend { margin-bottom: 8px; padding: 0; font-size: 12px; color: var(--muted); }
-#context label {
+.toggles legend { margin-bottom: 8px; padding: 0; font-size: 12px; color: var(--muted); }
+.toggles label {
   display: flex; align-items: center; gap: 6px;
   padding: 4px 12px;
   border: 1px solid var(--border);
@@ -79,8 +79,8 @@ input:disabled { opacity: 0.6; }
   background: var(--surface);
   cursor: pointer;
 }
-#context label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-#context input { accent-color: var(--accent); margin: 0; }
+.toggles label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.toggles input { accent-color: var(--accent); margin: 0; }
 
 main { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; }
 

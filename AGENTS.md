@@ -97,10 +97,11 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
       with `urllib`
 - `examples/snake/`: screenshot Snake demo (dependency-free)
   - `server.py`: standard-library static server on `127.0.0.1:8081`
-  - `js/`: ES modules: `game.js` (seeded rules, next cells, safe moves),
-    `request.js` (request from the context items chosen in the UI, answer
-    parsing), `controller.js` (fixed clock, one request in flight, one
-    answer waiting), `metrics.js`, `render.js`, `app.js` (UI)
+  - `js/`: ES modules: `game.js` (seeded rules, next cells, safe moves,
+    per-move facts), `request.js` (request from the context items and
+    option facts chosen in the UI, answer parsing), `controller.js` (fixed
+    clock, one request in flight, one answer waiting), `metrics.js`,
+    `render.js`, `app.js` (UI)
 - `configs/train/`: training run configs (YAML)
 - `configs/calibration/`: standalone calibration configs (YAML)
 - `configs/test/`: test run configs (YAML)

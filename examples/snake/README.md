@@ -37,18 +37,32 @@ setting allows this.
 - **Context sent to the model**: checkboxes, fixed per game, choose what is
   added. All facts are computed by the game code:
   - Screenshot: the clean board as one PNG, with its color description
-  - Text board: the grid as text (one row per line, top row first, `H`
-    head, `B` body, `F` food, `.` empty), at the end of `state`
+  - Text board: the grid as text inside a `+`, `-`, `|` border (one row per
+    line, top row first, `H` head, `#` body, `@` food, `.` empty), at the
+    end of `state`
   - Head position, food position: column and row from the top-left, 0 to 9
   - Food direction: from the head (`up`, `down-left`, ...)
   - Next cells: what the head would enter in each direction (a wall, the
     snake body, the food, or empty; the tail counts as empty because it
     moves away)
+  - Score: the number of foods eaten so far
   - Safety net: only safe directions (no wall, no body) are options. With
     one safe move, code takes it without the model ("code moves"); with
     none, no request is sent. Safety is checked on the board the model
     sees, so a late answer or straight moves while waiting can still hit a
     wall.
+- **Facts added to each option** (as in Decisio): checkboxes that add facts
+  to each option's description, computed for the move:
+  - Next head position (column, row)
+  - Closer / farther: whether the move gets closer to the food, or eats it
+  - Food distance before → after (Manhattan distance, obstacles ignored)
+  - Safe moves after the move, and which ones
+  - Reachable free squares after the move (the body stays where it is)
+  - Loop risk: visits to that square among the last 12 head positions
+    (cleared when the snake eats): low (0), medium (1), high (2 or more)
+
+  Without the safety net, a deadly option says "the snake dies" instead.
+- The snake starts with two squares: the head and one body square.
 - One request in flight and one answer waiting at most. A new screenshot is
   sent after a tick only when both are free.
 - Each screenshot is tagged with its tick. The answer is applied at the next

@@ -1,7 +1,7 @@
 // Page wiring: controls, panels and API health
 
 import { DemoController } from './controller.js';
-import { CONTEXT_ITEMS, DEFAULT_CONTEXT } from './request.js';
+import { CONTEXT_ITEMS, DEFAULT_CONTEXT, OPTION_FACTS } from './request.js';
 import { mean, median, toCsv } from './metrics.js';
 import { drawBoard, drawOverlay } from './render.js';
 
@@ -16,13 +16,23 @@ const LABELS = {
   food: 'Food position',
   direction: 'Food direction',
   cells: 'Next cells',
+  score: 'Score',
   safety: 'Safety net (safe options only)',
+  position: 'Next head position',
+  progress: 'Closer / farther',
+  distance: 'Food distance before → after',
+  exits: 'Safe moves after',
+  area: 'Reachable free squares',
+  loop: 'Loop risk',
 };
 
-// one checkbox per context item, checked as in the default context
-element('context').insertAdjacentHTML('beforeend', CONTEXT_ITEMS.map((item) => `
+// one checkbox per item, checked as in the default context
+const addCheckboxes = (section, items) => element(section).insertAdjacentHTML('beforeend', items.map((item) => `
   <label><input type="checkbox" id="context-${item}"${DEFAULT_CONTEXT[item] ? ' checked' : ''}> ${LABELS[item]}</label>`).join(''));
-const checkboxes = CONTEXT_ITEMS.map((item) => element(`context-${item}`));
+addCheckboxes('context', CONTEXT_ITEMS);
+addCheckboxes('option-facts', OPTION_FACTS);
+const ITEMS = [...CONTEXT_ITEMS, ...OPTION_FACTS];
+const checkboxes = ITEMS.map((item) => element(`context-${item}`));
 const inputs = [element('speed'), element('seed'), ...checkboxes];
 
 /** @returns {string} number with a fixed precision, or a dash */
@@ -46,7 +56,7 @@ function reset() {
   controller.reset(
     Number(element('speed').value),
     Math.trunc(Number(element('seed').value)),
-    Object.fromEntries(CONTEXT_ITEMS.map((item, index) => [item, checkboxes[index].checked])),
+    Object.fromEntries(ITEMS.map((item, index) => [item, checkboxes[index].checked])),
   );
 }
 

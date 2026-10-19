@@ -3,12 +3,14 @@ import { test } from 'node:test';
 
 import { SnakeGame } from '../../examples/snake/js/game.js';
 import {
-  boardText, buildRequest, CONTEXT_ITEMS, contextText, DEFAULT_CONTEXT, foodDirection, options, parseAnswer,
+  boardText, buildRequest, CONTEXT_ITEMS, contextText, DEFAULT_CONTEXT, foodDirection, OPTION_FACTS, optionText,
+  options, parseAnswer,
 } from '../../examples/snake/js/request.js';
 
 const IMAGE = 'data:image/png;base64,AAAA';
-const NOTHING = Object.fromEntries(CONTEXT_ITEMS.map((item) => [item, false]));
-const EVERYTHING = Object.fromEntries(CONTEXT_ITEMS.map((item) => [item, true]));
+const ITEMS = [...CONTEXT_ITEMS, ...OPTION_FACTS];
+const NOTHING = Object.fromEntries(ITEMS.map((item) => [item, false]));
+const EVERYTHING = Object.fromEntries(ITEMS.map((item) => [item, true]));
 
 /** @returns {SnakeGame} head at (9, 0) going right, food just below */
 function cornerGame() {
@@ -74,7 +76,8 @@ test('each fact appears only when chosen', () => {
     contextText(game, EVERYTHING),
     'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom). ' +
       'The head is at column 9, row 0. The food is at column 9, row 1. ' +
-      'Food direction from the head: down. Next to the head: up is a wall, down is the food, right is a wall.',
+      'Food direction from the head: down. Next to the head: up is a wall, down is the food, right is a wall. ' +
+      'Score: 0 (food eaten so far).',
   );
   assert.equal(
     contextText(game, { ...NOTHING, head: true }),
@@ -104,13 +107,41 @@ test('the food direction uses the 8 compass directions', () => {
   for (const [food, direction] of cases) assert.equal(foodDirection(head, food), direction);
 });
 
-test('the board text has one row per line with head, body and food', () => {
+test('the board text has a border and one row per line', () => {
   const game = new SnakeGame(1);
   game.food = { x: 9, y: 0 };
   const rows = boardText(game).split('\n');
-  assert.equal(rows.length, 10);
-  assert.equal(rows[0], '. . . . . . . . . F');
-  assert.equal(rows[5], '. . B B H . . . . .');
+  assert.equal(rows.length, 12);
+  assert.equal(rows[0], '+---------------------+');
+  assert.equal(rows[1], '| . . . . . . . . . @ |');
+  assert.equal(rows[6], '| . . . # H . . . . . |');
+  assert.equal(rows[11], rows[0]);
+});
+
+test('option facts go into each option description when chosen', () => {
+  const game = new SnakeGame(1);
+  game.food = { x: 0, y: 5 };
+  game.snake = [{ x: 4, y: 4 }, { x: 4, y: 5 }, { x: 3, y: 5 }, { x: 3, y: 4 }, { x: 3, y: 3 }];
+  game.heading = 'up';
+  assert.equal(optionText(game, 'right', NOTHING), 'toward the right side of the board');
+  assert.equal(
+    optionText(game, 'right', EVERYTHING),
+    'toward the right side of the board; the head moves to column 5, row 4; farther from the food; ' +
+      'food distance 5 -> 6; 3 safe moves after (up, down, right); 95 free squares reachable after; ' +
+      'loop risk low (visited 0 times recently)',
+  );
+  assert.equal(optionText(game, 'right', { ...NOTHING, progress: true }), 'toward the right side of the board; farther from the food');
+  const request = buildRequest(game, { ...NOTHING, safety: true, distance: true });
+  assert.deepEqual(request.questions.direction.criteria, {
+    up: 'toward the top of the board; food distance 5 -> 6',
+    right: 'toward the right side of the board; food distance 5 -> 6',
+  });
+});
+
+test('without the safety net a deadly option says the snake dies', () => {
+  const game = cornerGame();
+  assert.equal(optionText(game, 'up', { ...NOTHING, progress: true }), 'toward the top of the board; the snake dies: it hits a wall');
+  assert.equal(optionText(game, 'down', { ...NOTHING, progress: true }), 'toward the bottom of the board; eats the food');
 });
 
 test('parses a valid answer', () => {
