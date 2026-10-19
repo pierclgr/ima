@@ -15,25 +15,23 @@
 
 
 ## What is a System One model?
-A System One model answers in one fast step, like a gut feeling. It does not
-think in text first. The opposite, "System Two", writes its reasoning and then
-the answer. It is slower. IMA is a System One model.
+A System One model answers in one fast step, without generating tokens. It does 
+not think in text first.
 
 ## How IMA works
-IMA is built on a pretrained multimodal LLM (Hugging Face). It answers typed
-questions about a state (text and images) in one forward pass, with no text
-generation.
+IMA is built on a Qwen 3.5/3.8 pretrained multimodal LLM (Hugging Face).
+It answers typed questions about a state (text and images) in one forward pass, 
+with no text generation.
 
 1. Each question becomes a lettered prompt: images, state, question, and
    options (`A. ...`, `B. ...`).
 2. The model runs one forward pass. Only the logits of the option letters
    at the answer position are kept.
 3. A softmax with a global temperature turns them into one probability per
-   option. The temperature is fitted after training (calibration).
+   option. The temperature is fitted after training (*calibration* step).
 
 ### What it accepts
-A request has a `state` (text), up to eight images in `files` (base64 image
-data URLs) and one or more `questions`. Each question has a type:
+A request has a `state` (text), up to eight images in `files` and one or more `questions`. Each question has a type:
 - `noul`: yes or no. Returns the probability of "yes".
 - `choice`: one option out of many (up to 26). Returns the best option, a
   confidence and the probability of each option.
@@ -53,7 +51,7 @@ The training dataset is gated. Log in first with `hf auth login`.
 
 ### Train
 Training uses LoRA on the language model, then fits the temperature. The
-merged model goes to `<output_dir>/final`. Change any config value with
+merged model goes to `<output_dir>/final`. Override any config value with
 `--section.key value`.
 
 ```bash
@@ -104,21 +102,83 @@ export and serve:
 
 ```bash
 uv run --extra llamacpp python -m src.llamacpp.export runs/qwen3_5_0_8b/final exports/qwen3_5_0_8b --llama-cpp-dir ../llama.cpp
-python -m src.llamacpp.serve exports/qwen3_5_0_8b --llama-cpp-dir ../llama.cpp
+uv run python -m src.llamacpp.serve exports/qwen3_5_0_8b --llama-cpp-dir ../llama.cpp
 ```
 
 Use `--quantization Q8_0` or `Q4_K_M` on the export for a smaller model. The
-server listens on `127.0.0.1:8080` and exposes `POST /v1/systemone`. See
-[docs/LLAMACPP.md](docs/LLAMACPP.md) for details, and
-[examples/snake/README.md](examples/snake/README.md) for a demo that uses it.
+server listens on `127.0.0.1:8080` and exposes `POST /v1/systemone`.
 
-You can test a GGUF export with
-`configs/test/qwen3_5_0_8b_llamacpp.yml`.
+Check configuration file `configs/test/qwen3_5_0_8b_llamacpp.yml` to test a GGUF model.
+
+## Snake demo
+A browser Snake game where the System One server picks each direction from a
+screenshot of the board (plus optional text facts). The game runs on a fixed
+clock and applies each answer at the next tick, so slow answers are visible in
+the results.
+
+Start the GGUF server (see above), then the demo page server (Python standard
+library only):
+
+```bash
+uv run python examples/snake/server.py
+```
+
+Open <http://127.0.0.1:8081/>. The page calls `POST /v1/systemone` on
+`http://127.0.0.1:8080` directly. Pick the tick, seed and context (screenshot,
+text board, option facts) before each game. Finished games are added to a
+results table with a CSV download. Demo tests: `node --test 'tests/snake/*.test.mjs'`.
+
+## Cloud GPUs
+The same tasks (`cache`, `train`, `calibrate`, `test`) run on Modal and RunPod.
+The GPU comes from the config (`modal.gpu` or `runpod.gpu`, default H200).
+`--gpu` wins over it, and `--overrides "..."` passes config overrides.
+
+### Modal
+Needs `modal setup` and a Secret `huggingface` with your `HF_TOKEN`.
+
+```bash
+modal secret create huggingface HF_TOKEN=<token>
+
+# download the backbone and dataset once, into persistent Volumes
+modal run src/modal/app.py --task cache --config configs/train/qwen3_8_27b.yml
+
+# train (keeps running if you close the terminal)
+modal run --detach src/modal/app.py --task train --config configs/train/qwen3_8_27b.yml
+
+# calibrate or test
+modal run src/modal/app.py --task test --config configs/test/qwen3_8_27b.yml
+
+# TensorBoard on the training logs (prints the URL)
+modal deploy src/modal/tensorboard_app.py
+```
+
+### RunPod
+Each task gets its own pod. The pod clones this repository at a commit, runs
+the task and deletes itself. Results stay on a network volume. Run one task at
+a time. Setup, once:
+- create a network volume (Secure Cloud, in a data center with the GPU)
+- create a RunPod secret `huggingface` with your HF token
+- set `RUNPOD_API_KEY` and `RUNPOD_VOLUME_ID` in your shell
+
+```bash
+# download the backbone and dataset once, into the network volume
+uv run python -m src.runpod.app --task cache --config configs/train/qwen3_8_27b.yml
+
+# train (prints the TensorBoard URL)
+uv run python -m src.runpod.app --task train --config configs/train/qwen3_8_27b.yml
+
+# calibrate or test
+uv run python -m src.runpod.app --task test --config configs/test/qwen3_8_27b.yml
+```
+
+The pod runs the local `HEAD` commit, so push it first (`--ref` picks another
+commit). Task logs go to `runs/logs/<pod_id>.log` on the network volume.
 
 ## Results
 All models were trained on the `Jacqkues/kev-vision-decisions-full`
 dataset ([dataset card](https://huggingface.co/datasets/Jacqkues/kev-vision-decisions-full)),
-and tested on its `test` and `test_ood` splits:
+and tested on its `test` and `test_ood` splits. All tests were run on the
+same hardware, so the seconds per question are comparable:
 
 | Backbone | Model | Mode | Test set | Accuracy | Brier | ECE | Seconds/question |
 |---|---|---|---|---|---|---|---|
@@ -184,7 +244,9 @@ The original source code in this repository is licensed under the
 [Apache License 2.0](LICENSE).
 
 Datasets and model weights, including trained adapters and checkpoints, are
-excluded from this code license and require separate license terms. The
+excluded from this code license and require separate license terms. For this
+reason, they are not included in this repository: you must run the training
+yourself to get a trained model. The
 `Jacqkues/kev-vision-decisions-full` dataset requires non-commercial research
 use and compliance with each source's license; see its
 [dataset card](https://huggingface.co/datasets/Jacqkues/kev-vision-decisions-full).

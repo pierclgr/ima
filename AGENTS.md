@@ -5,7 +5,7 @@ IMA: Instant Multimodal Answers.
 
 Decoder-based System One decision model. A pretrained multimodal HF LLM
 answers typed questions in one forward pass (no generation). Probabilities are
-read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
+read from the logits of the option letters.
 
 ## Layout
 - `src/`: source code (package `src`, imports as `from src.x import ...`)
@@ -107,9 +107,9 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - `configs/test/`: test run configs (YAML)
 - `configs/distillation/`: soft label caching configs (`data`, `distillation`)
 - `tests/`: tracked regression tests; no model downloads or cloud jobs
-- `docs/`: documentation
 - `assets/`: images (e.g. the results graph used by `README.md`)
-- `README.md`: project overview (install, usage, configs, results)
+- `README.md`: project overview (install, usage, cloud runs, Snake demo,
+  results)
 
 ## Commands
 - `uv sync`: install the environment (includes `flash-linear-attention`,
@@ -119,10 +119,10 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - `uv run --extra llamacpp python -m src.llamacpp.export MODEL OUTPUT
   --llama-cpp-dir CHECKOUT [--quantization F16|Q8_0|Q4_K_M]`: export a
   merged checkpoint and its projector (source stays unchanged)
-- `python -m src.llamacpp.serve EXPORT --llama-cpp-dir CHECKOUT
+- `uv run python -m src.llamacpp.serve EXPORT --llama-cpp-dir CHECKOUT
   [--host HOST] [--port PORT] [--ctx-size N] [--gpu-layers N]
   [--api-key KEY]`: start the native System One API
-- `python examples/snake/server.py`: serve the Snake demo; it calls a
+- `uv run python examples/snake/server.py`: serve the Snake demo; it calls a
   separately started llama-server API from the browser
 - `node --test 'tests/snake/*.test.mjs'`: run the Snake demo tests (Node's
   built-in runner, no packages)
@@ -172,7 +172,6 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - Attach teacher targets before splitting whole calibration records
 - Validation and calibration use only human supervision
 - Resume a student adapter over the same original fine-tuned backbone
-- See `docs/DISTILLATION.md` for the implementation and experiment protocol
 
 ## Conventions
 - Snake UI: use shared CSS theme variables; keep the model's board colors
@@ -188,14 +187,13 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
   enforce the 10-level API limit only at the public pipeline boundary
 - GGUF: use llama.cpp's `openjev` scoring metadata with this project's
   prompt and temperature; never copy OpenJev's calibration constants
-- See `docs/LLAMACPP.md` for the tested revision and validation workflow
 - Python: PEP8, Google docstrings, type hints everywhere (PEP 484)
 - Native offline adapter: C++17, existing llama.cpp public/helper APIs,
   device synchronization around model work, no upstream source changes
 - Comments: start lowercase, no ending period
 - File names: `snake_case.py`; Markdown: `UPPER_SNAKE_CASE.md`
 - Markdown: max 80 chars per line
-- Structure: `src/` code, `tests/` tests, `docs/` documentation
+- Structure: `src/` code, `tests/` tests
 - Keep test source tracked; benchmark outputs belong in ignored `runs/`
 - Native integration tests opt in with `LLAMA_CPP_DIR` and `IMA_TEST_EXPORTS`
 - Git: branches `feature/snake_case`, `fix/snake_case`; commit messages in

@@ -16,7 +16,6 @@ class SystemOnePipeline(ChunkPipeline):
     """System One pipeline with the Jev `/v1/systemone` request and response.
 
     Each question of a request is one chunk: one forward pass, no generation.
-    See `docs/MODEL_SPEC.md` for the request and response format.
 
     Args:
         model: The System One model.
