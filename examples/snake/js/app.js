@@ -41,7 +41,10 @@ const format = (value, digits = 0) => (value === null || value === undefined ? '
 // the constructor calls onChange before the assignment, so render waits for it
 let controller = null;
 controller = new DemoController({
-  capture: () => board.toDataURL('image/png'),
+  capture: (game) => {
+    drawBoard(boardContext, game);
+    return board.toDataURL('image/png');
+  },
   fetch: (...args) => window.fetch(...args),
   clock: {
     now: () => performance.now(),
@@ -62,7 +65,7 @@ function reset() {
 
 /** Draws the board and refreshes all panels from the controller state. */
 function render() {
-  const { game, metrics, decision } = controller;
+  const { game, metrics, decision, lastInput } = controller;
   drawBoard(boardContext, game);
   drawOverlay(overlayContext, game, decision);
 
@@ -82,7 +85,7 @@ function render() {
         <span>${direction}</span><span><i style="width:${probability * 100}%"></i></span>
         <span>${(probability * 100).toFixed(1)}%</span>
       </div>`).join('')
-    : '<p>No answer yet</p>';
+    : '<p class="empty-state">Press Play to get the first decision.</p>';
 
   const lastMove = controller.log[0];
   const stats = {
@@ -102,11 +105,11 @@ function render() {
   };
   element('stats').innerHTML = Object.entries(stats).map(([key, value]) => `<dt>${key}</dt><dd>${value}</dd>`).join('');
 
-  if (decision?.image) element('screenshot').src = decision.image;
+  if (lastInput?.image) element('screenshot').src = lastInput.image;
   else element('screenshot').removeAttribute('src');
-  element('screenshot').hidden = !decision?.image;
-  element('board-text').hidden = !decision?.board;
-  element('board-text').textContent = decision?.board ?? '';
+  element('screenshot').hidden = !lastInput?.image;
+  element('board-text').hidden = !lastInput?.board;
+  element('board-text').textContent = lastInput?.board ?? '';
   const files = controller.lastRequest?.files;
   const request = files
     ? { ...controller.lastRequest, files: files.map((file) => `${file.slice(0, 40)}… (${file.length} chars)`) }
@@ -118,7 +121,7 @@ function render() {
     <tr>
       <td>${move.captureTick}</td><td>${move.applyTick}</td><td>${move.age}</td>
       <td>${format(move.ageMs)}</td><td>${move.direction}${move.code ? ' (code)' : ''}</td><td>${move.code ? '–' : format(move.latency)}</td>
-    </tr>`).join('');
+    </tr>`).join('') || '<tr><td colspan="6" class="empty-state">Applied moves will appear here.</td></tr>';
 
   const rows = controller.results;
   element('results').innerHTML = rows.length

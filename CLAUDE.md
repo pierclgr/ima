@@ -11,3 +11,9 @@ Runtime and timing contract: @docs/LLAMACPP.md
 
 Test source stays tracked in `tests/`; benchmark outputs go to `runs/`.
 Regression suite and native integration setup: @README.md
+
+## Conventions
+
+Follow the project conventions in @AGENTS.md.
+Snake page themes, layout, controls, input legends and capture timing:
+@examples/snake/README.md

@@ -61,11 +61,12 @@ test('an empty context sends only the game description and options', () => {
   assert.deepEqual(Object.keys(request.questions.direction.criteria), ['up', 'down', 'right']);
 });
 
-test('the text board comes last, with its legend in the description', () => {
+test('the text board comes last, with its legend directly above the grid', () => {
   const game = cornerGame();
   const request = buildRequest(game, { ...NOTHING, board: true });
   assert.deepEqual(Object.keys(request), ['state', 'questions']);
-  assert.match(request.state, /H is the snake head/);
+  assert.match(request.state, /\n\nLegend:[^\n]+\n[^\n]+\n\+-+\+/);
+  assert.equal(request.state.split('Legend:').length, 2);
   assert.ok(request.state.endsWith(`\n\n${boardText(game)}`));
 });
 
@@ -120,7 +121,9 @@ test('the food direction uses the 8 compass directions', () => {
 test('the board text has a border and one row per line', () => {
   const game = new SnakeGame(1);
   game.food = { x: 9, y: 0 };
-  const rows = boardText(game).split('\n');
+  const [legend, walls, ...rows] = boardText(game).split('\n');
+  assert.equal(legend, 'Legend: H = snake head, # = snake body, @ = food, . = empty square.');
+  assert.equal(walls, '+, - and | = walls.');
   assert.equal(rows.length, 12);
   assert.equal(rows[0], '+---------------------+');
   assert.equal(rows[1], '| . . . . . . . . . @ |');

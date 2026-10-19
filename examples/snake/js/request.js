@@ -35,10 +35,13 @@ const IMAGE =
   'bottom, left is the left side and right is the right side.';
 
 const BOARD =
-  'The board is written below, one row per line, top row first. H is the ' +
-  'snake head, # is the snake body, @ is the food and . is an empty square. ' +
-  'The border made of +, - and | is the wall. Up is the first line, down is ' +
-  'the last line, left is the start of a line and right is the end of a line.';
+  'The board is written below, one row per line, top row first. ' +
+  'Up is toward the top of the board, down toward the bottom, left toward ' +
+  'the start of a row and right toward its end.';
+
+const BOARD_LEGEND =
+  'Legend: H = snake head, # = snake body, @ = food, . = empty square.\n' +
+  '+, - and | = walls.';
 
 const QUESTION =
   'Which direction should the snake head move next to reach the food ' +
@@ -60,17 +63,22 @@ const PROGRESS = {
 };
 
 /**
- * Writes the board as text inside a border, one row per line, top row first.
+ * Writes a character legend above the bordered board, top row first.
  * @param {import('./game.js').SnakeGame} game
- * @returns {string} rows of `H` (head), `#` (body), `@` (food), `.` (empty)
- *   between `|`, with `+---+` lines above and below
+ * @returns {string} legend, then rows of `H` (head), `#` (body), `@` (food),
+ *   `.` (empty) between `|`, with `+---+` lines above and below the grid
  */
 export function boardText(game) {
   const rows = Array.from({ length: SIZE }, () => Array(SIZE).fill('.'));
   if (game.food) rows[game.food.y][game.food.x] = '@';
   game.snake.forEach((cell, index) => { rows[cell.y][cell.x] = index ? '#' : 'H'; });
   const border = `+${'-'.repeat(2 * SIZE + 1)}+`;
-  return [border, ...rows.map((row) => `| ${row.join(' ')} |`), border].join('\n');
+  return [
+    BOARD_LEGEND,
+    border,
+    ...rows.map((row) => `| ${row.join(' ')} |`),
+    border,
+  ].join('\n');
 }
 
 /**

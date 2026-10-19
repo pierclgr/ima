@@ -4,57 +4,132 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IMA Snake</title>
+  <script src="js/theme.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>IMA Snake</h1>
-    <form id="controls" onsubmit="return false">
-      <button id="play" type="button">Play</button>
-      <button id="reset" type="button">Reset</button>
-      <label>Tick <input id="speed" type="range" min="100" max="5000" step="50" value="200">
-        <output id="speed-value">200 ms</output></label>
-      <label>Seed <input id="seed" type="number" value="1" step="1"></label>
-      <label>API <input id="api" type="url" value="http://127.0.0.1:8080"></label>
-      <span id="health" class="status">checking…</span>
-    </form>
-    <fieldset id="context" class="toggles">
-      <legend>Context sent to the model</legend>
-    </fieldset>
-    <fieldset id="option-facts" class="toggles">
-      <legend>Facts added to each option</legend>
-    </fieldset>
+  <header class="page-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" fill="none">
+          <path d="M11 28h13a5 5 0 0 0 0-10h-8a5 5 0 0 1 0-10h13" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="28" cy="7" r="1" fill="var(--accent)"/>
+        </svg>
+      </span>
+      <div>
+        <p class="eyebrow">Instant Multimodal Answers</p>
+        <h1>IMA Snake <span class="title-tag">Playground</span></h1>
+        <p class="subtitle">See how your model plays, one move at a time.</p>
+      </div>
+    </div>
+    <div class="theme-switch" role="group" aria-label="Page theme">
+      <button type="button" data-theme-choice="light" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>
+        </svg>Light
+      </button>
+      <button type="button" data-theme-choice="dark" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <path d="M20 14.3A8.5 8.5 0 0 1 9.7 4a8.5 8.5 0 1 0 10.3 10.3Z"/>
+        </svg>Dark
+      </button>
+    </div>
   </header>
 
-  <main>
-    <section class="board">
-      <canvas id="board" width="512" height="512"></canvas>
-      <canvas id="overlay" width="512" height="512"></canvas>
-    </section>
+  <section class="card setup" aria-labelledby="setup-title">
+    <div class="section-heading">
+      <div><p class="eyebrow">Make your next run</p><h2 id="setup-title">Game setup</h2></div>
+      <span class="hint">Choose your settings before playing</span>
+    </div>
+    <form id="controls" onsubmit="return false">
+      <div class="actions">
+        <button id="play" type="button">Play</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
+      <label class="speed-control">Tick interval
+        <span><input id="speed" type="range" min="100" max="5000" step="50" value="200">
+          <output id="speed-value">200 ms</output></span>
+      </label>
+      <label class="seed-control">Seed <input id="seed" type="number" value="1" step="1"></label>
+      <label class="api-control">API endpoint <input id="api" type="url" value="http://127.0.0.1:8080"></label>
+      <span id="health" class="status" role="status">checking…</span>
+    </form>
+    <div class="settings-grid">
+      <fieldset id="context" class="toggles">
+        <legend>Context sent to the model</legend>
+      </fieldset>
+      <fieldset id="option-facts" class="toggles">
+        <legend>Facts added to each option</legend>
+      </fieldset>
+    </div>
+  </section>
 
-    <section class="panel">
-      <p id="model">Model: –</p>
-      <p id="error" class="error" hidden></p>
-      <h2>Direction</h2>
-      <div id="probabilities"></div>
-      <h2>Game</h2>
-      <dl id="stats"></dl>
-      <h2>Latest model input</h2>
-      <img id="screenshot" alt="Screenshot used for the latest decision" width="160" height="160">
-      <pre id="board-text" hidden></pre>
-      <details>
-        <summary>Request JSON</summary>
-        <pre id="request-json"></pre>
-      </details>
-      <details>
-        <summary>Response JSON</summary>
-        <pre id="response-json"></pre>
-      </details>
-    </section>
+  <main>
+    <div class="stage">
+      <section class="card board-card" aria-labelledby="board-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">The arena</p><h2 id="board-title">Live board</h2></div>
+          <span class="badge">10 × 10 grid</span>
+        </div>
+        <div class="board-frame">
+          <div class="board">
+            <canvas id="board" width="512" height="512" aria-label="Snake game board"></canvas>
+            <canvas id="overlay" width="512" height="512" aria-hidden="true"></canvas>
+          </div>
+        </div>
+        <div class="board-legend" aria-label="Board colors">
+          <span><i class="dot head-dot"></i>Head</span>
+          <span><i class="dot snake-dot"></i>Snake</span>
+          <span><i class="dot food-dot"></i>Food</span>
+          <span class="hint">One move per tick</span>
+        </div>
+      </section>
+
+      <section class="card input-card" aria-labelledby="input-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">Behind the move</p><h2 id="input-title">Latest model input</h2></div>
+        </div>
+        <div class="input-preview">
+          <img id="screenshot" alt="Screenshot sent in the latest request" width="160" height="160">
+          <pre id="board-text" hidden></pre>
+        </div>
+        <div class="json-grid">
+          <details>
+            <summary>Request JSON</summary>
+            <pre id="request-json"></pre>
+          </details>
+          <details>
+            <summary>Response JSON</summary>
+            <pre id="response-json"></pre>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <aside class="panel" aria-label="Model decision and game metrics">
+      <section class="card decision-card" aria-labelledby="decision-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">The next move</p><h2 id="decision-title">Model decision</h2></div>
+          <span class="badge">Probabilities</span>
+        </div>
+        <p id="model">Model: –</p>
+        <p id="error" class="error" role="alert" hidden></p>
+        <div id="probabilities"></div>
+      </section>
+      <section class="card metrics-card" aria-labelledby="metrics-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">Every tick counts</p><h2 id="metrics-title">Game metrics</h2></div>
+        </div>
+        <dl id="stats"></dl>
+      </section>
+    </aside>
   </main>
 
-  <section>
-    <h2>Move log</h2>
+  <section class="card history-card" aria-labelledby="log-title">
+    <div class="section-heading">
+      <div><p class="eyebrow">Step by step</p><h2 id="log-title">Move log</h2></div>
+      <span class="hint">The latest 100 moves</span>
+    </div>
     <div class="scroll">
       <table>
         <thead><tr><th>Capture tick</th><th>Apply tick</th><th>Age (ticks)</th><th>Age (ms)</th>
@@ -64,8 +139,11 @@
     </div>
   </section>
 
-  <section>
-    <h2>Completed games <button id="csv" type="button">Download CSV</button></h2>
+  <section class="card history-card" aria-labelledby="results-title">
+    <div class="section-heading">
+      <div><p class="eyebrow">Compare your runs</p><h2 id="results-title">Completed games</h2></div>
+      <button id="csv" type="button">Download CSV <span aria-hidden="true">↓</span></button>
+    </div>
     <div class="scroll">
       <table id="results"></table>
     </div>

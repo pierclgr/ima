@@ -101,7 +101,7 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
     per-move facts), `request.js` (request from the context items and
     option facts chosen in the UI, answer parsing), `controller.js` (fixed
     clock, one request in flight, one answer waiting), `metrics.js`,
-    `render.js`, `app.js` (UI)
+    `render.js`, `app.js` (UI), `theme.js` (saved light/dark preference)
 - `configs/train/`: training run configs (YAML)
 - `configs/calibration/`: standalone calibration configs (YAML)
 - `configs/test/`: test run configs (YAML)
@@ -175,6 +175,12 @@ read from the logits of the option letters. See `docs/MODEL_SPEC.md`.
 - See `docs/DISTILLATION.md` for the implementation and experiment protocol
 
 ## Conventions
+- Snake UI: use shared CSS theme variables; keep the model's board colors
+  independent of the page theme and preserve the square board layout
+- Snake capture: draw the current game before serializing the PNG; update
+  the input preview on request send, independently of the latest answer
+- Snake text board: include the character legend directly above the grid
+  in both the request and input preview
 - System One API: native llama.cpp `files` (`images` alias), image data
   URLs, at most eight images, score questions with 2–10 levels, native
   score confidence; dataset records keep PIL images in `files`

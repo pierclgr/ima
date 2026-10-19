@@ -10,7 +10,8 @@ import {
 export class DemoController {
   /**
    * @param {object} options
-   * @param {() => string} options.capture clean board as a PNG data URL
+   * @param {(game: import('./game.js').SnakeGame) => string} options.capture
+   *   draws the current game and returns a clean PNG data URL
    * @param {typeof fetch} options.fetch HTTP client
    * @param {{now: () => number, setInterval: Function, clearInterval: Function}}
    *   options.clock monotonic clock and timers
@@ -49,6 +50,7 @@ export class DemoController {
     this.metrics = new RunMetrics();
     this.log = [];
     this.decision = null;
+    this.lastInput = null;
     this.lastRequest = null;
     this.lastResponse = null;
     this.lastError = null;
@@ -127,12 +129,13 @@ export class DemoController {
       return;
     }
     const generation = this.generation;
-    const image = this.context.screenshot ? this.capture() : undefined;
+    const image = this.context.screenshot ? this.capture(this.game) : undefined;
     const board = this.context.board ? boardText(this.game) : undefined;
     const request = buildRequest(this.game, this.context, image);
     this.inFlight = true;
     this.metrics.requests += 1;
     this.lastRequest = request;
+    this.lastInput = { image, board };
     let response = null;
     try {
       const reply = await this.fetch(`${this.apiUrl}/v1/systemone`, {

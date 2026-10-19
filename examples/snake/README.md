@@ -27,10 +27,22 @@ Open <http://127.0.0.1:8081/>. The API URL defaults to
 browser calls `POST /v1/systemone` directly. The default llama-server CORS
 setting allows this.
 
+## Page and themes
+
+- Use **Light** or **Dark** in the header to change the page theme.
+- The first visit uses the system theme. A choice is saved in this browser
+  and restored on reload. If browser storage is blocked, switching still
+  works for the current page.
+- The board, model input, probabilities, game metrics and run history have
+  separate cards. The layout stacks on narrow screens.
+- Both themes keep the board square and use the same board image and colors
+  for model requests.
+
 ## How it works
 
-- 10 × 10 board on a 512 × 512 canvas. The clean board is sent as one PNG;
-  probability marks are drawn on a separate overlay canvas.
+- 10 × 10 board on a 512 × 512 canvas. The board stays square on screen,
+  including when JSON panels are open and on narrow windows. The clean
+  board is sent as one PNG; probability marks use a separate overlay canvas.
 - One `choice` question with `up`, `down`, `left`, `right`, minus the
   direction back into the body. `state` always starts with a short game
   description and fixed priority rules, in Decisio's order: survive (no
@@ -41,9 +53,10 @@ setting allows this.
   added. Only the screenshot is on by default. All facts are computed by
   the game code:
   - Screenshot: the clean board as one PNG, with its color description
-  - Text board: the grid as text inside a `+`, `-`, `|` border (one row per
-    line, top row first, `H` head, `#` body, `@` food, `.` empty), at the
-    end of `state`
+  - Text board: a short character legend directly above the grid, in both
+    the request and input preview. The grid uses `H` for the head, `#` for
+    the body, `@` for food, `.` for empty squares, and `+`, `-`, `|` for
+    walls (one row per line, top row first), at the end of `state`
   - Head position, food position: column and row from the top-left, 0 to 9
   - Food direction: from the head (`up`, `down-left`, ...)
   - Score: the number of foods eaten so far
@@ -70,6 +83,11 @@ setting allows this.
 - The snake starts with two squares: the head and one body square.
 - One request in flight and one answer waiting at most. A new screenshot is
   sent after a tick only when both are free.
+- Draw the current board before each PNG capture, so the screenshot and
+  text facts describe the same tick.
+- **Latest model input** shows the most recently sent screenshot and text
+  board as soon as the request starts. It keeps that input while the model
+  is answering, even if the live game advances.
 - Each screenshot is tagged with its tick. The answer is applied at the next
   tick; its age is the apply tick minus the screenshot tick (1 is fresh).
 - Pause and reset ignore any reply that is still on its way.
