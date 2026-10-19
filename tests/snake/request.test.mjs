@@ -20,17 +20,28 @@ function cornerGame() {
   return game;
 }
 
-test('the default context sends one PNG and the facts, not the board', () => {
+test('the priority rules are always sent, right after the game description', () => {
+  for (const context of [NOTHING, DEFAULT_CONTEXT, EVERYTHING]) {
+    const description = buildRequest(cornerGame(), context, IMAGE).state.split('\n\n')[0];
+    assert.match(description, /the body\. Choose the move with these priorities, in this order\. First, survive: never move into a wall/);
+  }
+});
+
+test('the default context sends only the screenshot and plain options', () => {
+  assert.deepEqual(ITEMS.filter((item) => DEFAULT_CONTEXT[item]), ['screenshot']);
   const game = cornerGame();
   const request = buildRequest(game, DEFAULT_CONTEXT, IMAGE);
   assert.deepEqual(Object.keys(request), ['state', 'files', 'questions']);
   assert.deepEqual(request.files, [IMAGE]);
   assert.match(request.state, /^This is a Snake game .* The image shows the board\./);
-  assert.ok(request.state.endsWith(`\n\n${contextText(game, DEFAULT_CONTEXT)}`));
-  assert.doesNotMatch(request.state, /\. \. /);
+  assert.doesNotMatch(request.state, /\n|column|Score/);
   const question = request.questions.direction;
   assert.equal(question.type, 'choice');
-  assert.deepEqual(Object.keys(question.criteria), ['down']);
+  assert.deepEqual(question.criteria, {
+    up: 'toward the top of the board',
+    down: 'toward the bottom of the board',
+    right: 'toward the right side of the board',
+  });
 });
 
 test('only the image changes between two screenshot requests', () => {
@@ -43,10 +54,9 @@ test('only the image changes between two screenshot requests', () => {
 test('an empty context sends only the game description and options', () => {
   const request = buildRequest(new SnakeGame(1), NOTHING);
   assert.deepEqual(Object.keys(request), ['state', 'questions']);
-  assert.equal(
+  assert.match(
     request.state,
-    'This is a Snake game on a 10 by 10 grid. The snake moves one square at a time and the game ends if ' +
-      'the head hits a wall or the body.',
+    /^This is a Snake game on a 10 by 10 grid\. The snake moves one square at a time and the game ends if the head hits a wall or the body\. Choose the move with these priorities, in this order\. First, survive: .* avoids a loop\.$/,
   );
   assert.deepEqual(Object.keys(request.questions.direction.criteria), ['up', 'down', 'right']);
 });
@@ -76,17 +86,17 @@ test('each fact appears only when chosen', () => {
     contextText(game, EVERYTHING),
     'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom). ' +
       'The head is at column 9, row 0. The food is at column 9, row 1. ' +
-      'Food direction from the head: down. Next to the head: up is a wall, down is the food, right is a wall. ' +
-      'Score: 0 (food eaten so far).',
+      'Food direction from the head: down. Score: 0 (food eaten so far).',
   );
   assert.equal(
     contextText(game, { ...NOTHING, head: true }),
     'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom). The head is at column 9, row 0.',
   );
   assert.equal(contextText(game, { ...NOTHING, direction: true }), 'Food direction from the head: down.');
+  assert.equal(contextText(game, { ...NOTHING, cells: true }), '');
   assert.equal(
-    contextText(game, { ...NOTHING, cells: true }),
-    'Next to the head: up is a wall, down is the food, right is a wall.',
+    contextText(game, { ...NOTHING, position: true }),
+    'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom).',
   );
 });
 
@@ -126,7 +136,8 @@ test('option facts go into each option description when chosen', () => {
   assert.equal(optionText(game, 'right', NOTHING), 'toward the right side of the board');
   assert.equal(
     optionText(game, 'right', EVERYTHING),
-    'toward the right side of the board; the head moves to column 5, row 4; farther from the food; ' +
+    'toward the right side of the board; the next square is at column 5, row 4; the next square is empty; ' +
+      'farther from the food; ' +
       'food distance 5 -> 6; 3 safe moves after (up, down, right); 95 free squares reachable after; ' +
       'loop risk low (visited 0 times recently)',
   );
@@ -136,6 +147,13 @@ test('option facts go into each option description when chosen', () => {
     up: 'toward the top of the board; food distance 5 -> 6',
     right: 'toward the right side of the board; food distance 5 -> 6',
   });
+});
+
+test('next cell content says empty or food for each safe option', () => {
+  const game = cornerGame();
+  assert.equal(optionText(game, 'down', { ...NOTHING, cells: true }), 'toward the bottom of the board; the next square has the food');
+  const open = new SnakeGame(1);
+  assert.equal(optionText(open, 'up', { ...NOTHING, cells: true }), 'toward the top of the board; the next square is empty');
 });
 
 test('without the safety net a deadly option says the snake dies', () => {

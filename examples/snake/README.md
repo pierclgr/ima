@@ -32,19 +32,20 @@ setting allows this.
 - 10 × 10 board on a 512 × 512 canvas. The clean board is sent as one PNG;
   probability marks are drawn on a separate overlay canvas.
 - One `choice` question with `up`, `down`, `left`, `right`, minus the
-  direction back into the body. `state` starts with a short game
-  description.
+  direction back into the body. `state` always starts with a short game
+  description and fixed priority rules, in Decisio's order: survive (no
+  wall, no body, keep space), avoid dead ends, eat the food when an escape
+  stays open, move toward the food when safe, prefer squares not visited
+  recently.
 - **Context sent to the model**: checkboxes, fixed per game, choose what is
-  added. All facts are computed by the game code:
+  added. Only the screenshot is on by default. All facts are computed by
+  the game code:
   - Screenshot: the clean board as one PNG, with its color description
   - Text board: the grid as text inside a `+`, `-`, `|` border (one row per
     line, top row first, `H` head, `#` body, `@` food, `.` empty), at the
     end of `state`
   - Head position, food position: column and row from the top-left, 0 to 9
   - Food direction: from the head (`up`, `down-left`, ...)
-  - Next cells: what the head would enter in each direction (a wall, the
-    snake body, the food, or empty; the tail counts as empty because it
-    moves away)
   - Score: the number of foods eaten so far
   - Safety net: only safe directions (no wall, no body) are options. With
     one safe move, code takes it without the model ("code moves"); with
@@ -53,7 +54,10 @@ setting allows this.
     wall.
 - **Facts added to each option** (as in Decisio): checkboxes that add facts
   to each option's description, computed for the move:
-  - Next head position (column, row)
+  - Next cell position: the square the head moves to (column, row; the
+    column and row sentence is then sent too)
+  - Next cell content: whether that square is empty or has the food (the
+    tail square counts as empty because the tail moves away)
   - Closer / farther: whether the move gets closer to the food, or eats it
   - Food distance before → after (Manhattan distance, obstacles ignored)
   - Safe moves after the move, and which ones
@@ -61,7 +65,8 @@ setting allows this.
   - Loop risk: visits to that square among the last 12 head positions
     (cleared when the snake eats): low (0), medium (1), high (2 or more)
 
-  Without the safety net, a deadly option says "the snake dies" instead.
+  Without the safety net, a deadly option says what it hits and "the snake
+  dies" instead.
 - The snake starts with two squares: the head and one body square.
 - One request in flight and one answer waiting at most. A new screenshot is
   sent after a tick only when both are free.
@@ -76,6 +81,9 @@ results table (CSV download), with the context as `screenshot+cells+...`.
 
 Latency is the browser round-trip time (`performance.now()`), not inference
 time: the API does not return inference timing.
+
+Open **Request JSON** and **Response JSON** to inspect the latest payloads
+in separate fields.
 
 ## Tests
 

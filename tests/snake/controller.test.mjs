@@ -6,6 +6,8 @@ import { toCsv } from '../../examples/snake/js/metrics.js';
 import { CONTEXT_ITEMS, DEFAULT_CONTEXT } from '../../examples/snake/js/request.js';
 
 const NOTHING = Object.fromEntries(CONTEXT_ITEMS.map((item) => [item, false]));
+// the facts and the safety net, on top of the screenshot-only default
+const FACTS = { ...DEFAULT_CONTEXT, head: true, food: true, direction: true, cells: true, safety: true };
 
 const TICK = 200;
 
@@ -71,8 +73,11 @@ function reply(direction, status = 200) {
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-/** @returns {object} controller with a seeded game, food out of the way */
-function setup() {
+/**
+ * @param {object} context items sent to the model
+ * @returns {object} controller with a seeded game, food out of the way
+ */
+function setup(context = DEFAULT_CONTEXT) {
   const clock = new FakeClock();
   const { fetch, calls } = fakeFetch();
   const controller = new DemoController({
@@ -81,7 +86,7 @@ function setup() {
     clock,
     onChange: () => {},
   });
-  controller.reset(TICK, 1, DEFAULT_CONTEXT);
+  controller.reset(TICK, 1, context);
   controller.game.food = { x: 0, y: 0 };
   return { clock, calls, controller };
 }
@@ -179,11 +184,11 @@ test('a reply from before a reset does not affect the new game', async () => {
 });
 
 test('the direction back is not sent and is rejected as an answer', async () => {
-  const { clock, calls, controller } = setup();
+  const { clock, calls, controller } = setup(FACTS);
   controller.play();
   assert.deepEqual(Object.keys(calls[0].body.questions.direction.criteria), ['up', 'down', 'right']);
   assert.match(calls[0].body.state, /The head is at column 4, row 5\. The food is at column 0, row 0\./);
-  assert.match(calls[0].body.state, /Next to the head: up is empty, down is empty, right is empty\.$/);
+  assert.equal(calls[0].body.questions.direction.criteria.up, 'toward the top of the board; the next square is empty');
   calls[0].resolve(reply('left'));
   await flush();
   assert.match(controller.lastError, /invalid response/);
@@ -194,7 +199,7 @@ test('the direction back is not sent and is rejected as an answer', async () => 
 });
 
 test('with one safe move, code takes it without asking the model', async () => {
-  const { clock, calls, controller } = setup();
+  const { clock, calls, controller } = setup(FACTS);
   controller.game.snake = [{ x: 9, y: 0 }, { x: 8, y: 0 }, { x: 7, y: 0 }];
   controller.play();
   assert.equal(calls.length, 0);
@@ -207,7 +212,7 @@ test('with one safe move, code takes it without asking the model', async () => {
 });
 
 test('with no safe move, nothing is sent and the snake goes straight', async () => {
-  const { clock, calls, controller } = setup();
+  const { clock, calls, controller } = setup(FACTS);
   controller.game.snake = [{ x: 9, y: 0 }, { x: 9, y: 1 }, { x: 8, y: 1 }, { x: 8, y: 0 }, { x: 7, y: 0 }];
   controller.play();
   assert.equal(calls.length, 0);
@@ -253,7 +258,7 @@ test('game over stops the clock and saves a results row', async () => {
   assert.equal(calls[0].body.files, undefined);
   assert.match(calls[0].body.state, /\| \. \. \. # H/);
   assert.equal(controller.log.length > 0 && 'board' in controller.decision, true);
-  assert.equal(row.context, 'board+head+food+direction+cells+safety+progress');
+  assert.equal(row.context, 'board+progress');
   assert.equal(row.seed, 9);
   assert.equal(row.tick_ms, 300);
   assert.equal(row.ticks, 6);

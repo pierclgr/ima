@@ -15,10 +15,10 @@ const LABELS = {
   head: 'Head position',
   food: 'Food position',
   direction: 'Food direction',
-  cells: 'Next cells',
   score: 'Score',
   safety: 'Safety net (safe options only)',
-  position: 'Next head position',
+  position: 'Next cell position',
+  cells: 'Next cell content',
   progress: 'Closer / farther',
   distance: 'Food distance before → after',
   exits: 'Safe moves after',
@@ -111,7 +111,8 @@ function render() {
   const request = files
     ? { ...controller.lastRequest, files: files.map((file) => `${file.slice(0, 40)}… (${file.length} chars)`) }
     : controller.lastRequest;
-  element('json').textContent = JSON.stringify({ request, response: controller.lastResponse }, null, 2);
+  element('request-json').textContent = JSON.stringify(request, null, 2);
+  element('response-json').textContent = JSON.stringify(controller.lastResponse, null, 2);
 
   element('log').innerHTML = controller.log.slice(0, 100).map((move) => `
     <tr>

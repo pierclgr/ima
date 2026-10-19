@@ -3,19 +3,30 @@
 import { SIZE } from './game.js';
 
 // what the request can contain, in the order of the UI and the results
-export const CONTEXT_ITEMS = ['screenshot', 'board', 'head', 'food', 'direction', 'cells', 'score', 'safety'];
+export const CONTEXT_ITEMS = ['screenshot', 'board', 'head', 'food', 'direction', 'score', 'safety'];
 
 // facts added to each option's description, as Decisio does
-export const OPTION_FACTS = ['position', 'progress', 'distance', 'exits', 'area', 'loop'];
+export const OPTION_FACTS = ['position', 'cells', 'progress', 'distance', 'exits', 'area', 'loop'];
 
+// only the screenshot is on by default; every addition is opt-in
 export const DEFAULT_CONTEXT = {
-  screenshot: true, board: false, head: true, food: true, direction: true, cells: true, score: false, safety: true,
-  position: false, progress: false, distance: false, exits: false, area: false, loop: false,
+  screenshot: true, board: false, head: false, food: false, direction: false, score: false, safety: false,
+  position: false, cells: false, progress: false, distance: false, exits: false, area: false, loop: false,
 };
 
 const GAME =
   'This is a Snake game on a 10 by 10 grid. The snake moves one square at ' +
   'a time and the game ends if the head hits a wall or the body.';
+
+// always sent: Decisio's decision priorities, in the same order
+const RULES =
+  'Choose the move with these priorities, in this order. First, survive: ' +
+  'never move into a wall or into the snake body, and keep space to move ' +
+  'later. Then avoid dead ends and moves that leave the snake little free ' +
+  'space. Then eat the food when the snake can still escape after eating. ' +
+  'Then move toward the food when it is safe. Finally, prefer squares the ' +
+  'snake has not visited recently. Moving away from the food can be the ' +
+  'right choice when it keeps escape space or avoids a loop.';
 
 const IMAGE =
   'The image shows the board. The background is light gray with a grid. The ' +
@@ -40,7 +51,7 @@ const CRITERIA = {
   right: 'toward the right side of the board',
 };
 
-const CONTENTS = { wall: 'a wall', body: 'the snake body', food: 'the food', empty: 'empty' };
+const CONTENTS = { wall: 'a wall', body: 'the snake body' };
 
 const PROGRESS = {
   closer: 'closer to the food',
@@ -76,27 +87,23 @@ export function foodDirection(head, food) {
 
 /**
  * Writes the facts chosen in `context`, computed from the game: head and
- * food positions, food direction and what the head would enter in each
- * direction except back.
+ * food positions, food direction and score. The column and row sentence is
+ * also sent for the next cell positions of the options.
  * @param {import('./game.js').SnakeGame} game
- * @param {Object<string, boolean>} context chosen items (`CONTEXT_ITEMS`)
+ * @param {Object<string, boolean>} context chosen items (`CONTEXT_ITEMS`
+ *   and `position`)
  * @returns {string} e.g. "Columns go from ... The head is at column 4, row
- *   5. Food direction from the head: up-right. Next to the head: ...", or ''
+ *   5. Food direction from the head: up-right.", or ''
  */
 export function contextText(game, context) {
   const head = game.snake[0];
   const facts = [];
-  if (context.head || context.food) {
+  if (context.head || context.food || context.position) {
     facts.push(`Columns go from 0 (left) to ${SIZE - 1} (right) and rows from 0 (top) to ${SIZE - 1} (bottom).`);
   }
   if (context.head) facts.push(`The head is at column ${head.x}, row ${head.y}.`);
   if (context.food) facts.push(`The food is at column ${game.food.x}, row ${game.food.y}.`);
   if (context.direction) facts.push(`Food direction from the head: ${foodDirection(head, game.food)}.`);
-  if (context.cells) {
-    const cells = Object.entries(game.nextCells())
-      .map(([direction, content]) => `${direction} is ${CONTENTS[content]}`);
-    facts.push(`Next to the head: ${cells.join(', ')}.`);
-  }
   if (context.score) facts.push(`Score: ${game.score} (food eaten so far).`);
   return facts.join(' ');
 }
@@ -107,8 +114,8 @@ export function contextText(game, context) {
  * @param {import('./game.js').SnakeGame} game
  * @param {string} direction the option
  * @param {Object<string, boolean>} context chosen items (`OPTION_FACTS`)
- * @returns {string} e.g. "toward the left side of the board; closer to the
- *   food; food distance 5 -> 4; 3 safe moves after (up, down, left)"
+ * @returns {string} e.g. "toward the left side of the board; the next
+ *   square is empty; closer to the food; 3 safe moves after (up, down, left)"
  */
 export function optionText(game, direction, context) {
   const parts = [CRITERIA[direction]];
@@ -117,7 +124,8 @@ export function optionText(game, direction, context) {
     return `${parts[0]}; the snake dies: it hits ${CONTENTS[game.nextCells()[direction]]}`;
   }
   const facts = game.moveFacts(direction);
-  if (context.position) parts.push(`the head moves to column ${facts.next.x}, row ${facts.next.y}`);
+  if (context.position) parts.push(`the next square is at column ${facts.next.x}, row ${facts.next.y}`);
+  if (context.cells) parts.push(facts.eats ? 'the next square has the food' : 'the next square is empty');
   if (context.progress) parts.push(PROGRESS[facts.progress]);
   if (context.distance) parts.push(`food distance ${facts.distanceBefore} -> ${facts.distanceAfter}`);
   if (context.exits) parts.push(`${facts.exits.length} safe moves after (${facts.exits.join(', ') || 'none'})`);
@@ -146,7 +154,7 @@ export function options(game, safety) {
  * @returns {object} request body
  */
 export function buildRequest(game, context, image) {
-  const description = [GAME];
+  const description = [GAME, RULES];
   if (context.screenshot) description.push(IMAGE);
   if (context.board) description.push(BOARD);
   const blocks = [description.join(' '), contextText(game, context)];
