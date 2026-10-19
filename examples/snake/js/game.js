@@ -116,6 +116,37 @@ export class SnakeGame {
   }
 
   /**
+   * Finds the shortest sequence of moves from the head to the food, searching
+   * breadth first. A body part blocks its cell only until the tail passes it,
+   * and the first move is never a reverse turn.
+   * @returns {string[] | null} directions in order, null when the body closes
+   *   every way to the food
+   */
+  shortestPath() {
+    const length = this.snake.length;
+    const key = (cell) => cell.y * SIZE + cell.x;
+    // moves after which each body cell is free: the tail is free after move 1
+    const freeAfter = new Map(this.snake.map((part, index) => [key(part), length - 1 - index]));
+    const paths = new Map([[key(this.snake[0]), []]]);
+    const queue = [this.snake[0]];
+    for (let index = 0; index < queue.length; index += 1) {
+      const cell = queue[index];
+      const path = paths.get(key(cell));
+      const moves = DIRECTIONS.filter((direction) => path.length > 0 || direction !== OPPOSITE[this.heading]);
+      for (const direction of moves) {
+        const [dx, dy] = MOVES[direction];
+        const next = { x: cell.x + dx, y: cell.y + dy };
+        const blocked = (freeAfter.get(key(next)) ?? 0) >= path.length + 1;
+        if (!inside(next) || blocked || paths.has(key(next))) continue;
+        paths.set(key(next), [...path, direction]);
+        if (same(next, this.food)) return paths.get(key(next));
+        queue.push(next);
+      }
+    }
+    return null;
+  }
+
+  /**
    * Computes the per-option facts of a safe move, as Decisio does.
    * @param {string} direction a direction from `safeMoves`
    * @returns {{next: {x: number, y: number}, eats: boolean,

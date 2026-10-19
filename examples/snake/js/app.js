@@ -15,6 +15,7 @@ const LABELS = {
   head: 'Head position',
   food: 'Food position',
   direction: 'Food direction',
+  path: 'Shortest path to food',
   score: 'Score',
   safety: 'Safety net (safe options only)',
   position: 'Next cell position',

@@ -94,6 +94,37 @@ test('the tail cell counts as empty because the tail moves away', () => {
   assert.equal(game.nextCells().left, 'empty');
 });
 
+test('the shortest path lists the moves from the head to the food', () => {
+  assert.deepEqual(gameWithFood({ x: 7, y: 5 }).shortestPath(), ['right', 'right', 'right']);
+  assert.deepEqual(gameWithFood({ x: 3, y: 4 }).shortestPath(), ['up', 'left']);
+});
+
+test('the shortest path never starts with a reverse turn', () => {
+  // head (4, 5) goes right: left is back, so the food behind needs a detour
+  assert.equal(gameWithFood({ x: 2, y: 5 }).shortestPath().length, 4);
+});
+
+test('the shortest path goes around the body', () => {
+  const game = gameWithFood({ x: 4, y: 3 });
+  game.snake = [{ x: 4, y: 5 }, { x: 4, y: 4 }, { x: 5, y: 4 }, { x: 5, y: 5 }];
+  game.heading = 'down';
+  assert.equal(game.shortestPath().length, 4);
+});
+
+test('the shortest path goes through the tail cell because the tail moves away', () => {
+  const game = gameWithFood({ x: 4, y: 3 });
+  game.snake = [{ x: 4, y: 5 }, { x: 3, y: 5 }, { x: 3, y: 4 }, { x: 4, y: 4 }];
+  assert.deepEqual(game.shortestPath(), ['up', 'up']);
+});
+
+test('the shortest path is null when the body closes the way to the food', () => {
+  const game = gameWithFood({ x: 0, y: 0 });
+  // a long body keeps both squares next to the food blocked
+  const filler = Array.from({ length: 10 }, (_, x) => ({ x, y: 9 }));
+  game.snake = [{ x: 5, y: 5 }, { x: 1, y: 0 }, { x: 0, y: 1 }, ...filler];
+  assert.equal(game.shortestPath(), null);
+});
+
 test('move facts give food progress, distances, exits and free squares', () => {
   const game = gameWithFood({ x: 0, y: 5 });
   game.snake = [{ x: 4, y: 4 }, { x: 4, y: 5 }, { x: 3, y: 5 }, { x: 3, y: 4 }, { x: 3, y: 3 }];

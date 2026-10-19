@@ -3,14 +3,14 @@
 import { SIZE } from './game.js';
 
 // what the request can contain, in the order of the UI and the results
-export const CONTEXT_ITEMS = ['screenshot', 'board', 'head', 'food', 'direction', 'score', 'safety'];
+export const CONTEXT_ITEMS = ['screenshot', 'board', 'head', 'food', 'direction', 'path', 'score', 'safety'];
 
 // facts added to each option's description, as Decisio does
 export const OPTION_FACTS = ['position', 'cells', 'progress', 'distance', 'exits', 'area', 'loop'];
 
 // only the screenshot is on by default; every addition is opt-in
 export const DEFAULT_CONTEXT = {
-  screenshot: true, board: false, head: false, food: false, direction: false, score: false, safety: false,
+  screenshot: true, board: false, head: false, food: false, direction: false, path: false, score: false, safety: false,
   position: false, cells: false, progress: false, distance: false, exits: false, area: false, loop: false,
 };
 
@@ -94,8 +94,20 @@ export function foodDirection(head, food) {
 }
 
 /**
+ * Writes the shortest path to the food as a sentence.
+ * @param {string[] | null} path moves from `SnakeGame.shortestPath`
+ * @returns {string} e.g. "Shortest path to the food (2 moves): up, left.",
+ *   or "No path to the food." when `path` is null
+ */
+function pathText(path) {
+  if (!path) return 'No path to the food.';
+  const moves = `${path.length} ${path.length === 1 ? 'move' : 'moves'}`;
+  return `Shortest path to the food (${moves}): ${path.join(', ')}.`;
+}
+
+/**
  * Writes the facts chosen in `context`, computed from the game: head and
- * food positions, food direction and score. The column and row sentence is
+ * food positions, food direction, shortest path to the food and score. The column and row sentence is
  * also sent for the next cell positions of the options.
  * @param {import('./game.js').SnakeGame} game
  * @param {Object<string, boolean>} context chosen items (`CONTEXT_ITEMS`
@@ -112,6 +124,7 @@ export function contextText(game, context) {
   if (context.head) facts.push(`The head is at column ${head.x}, row ${head.y}.`);
   if (context.food) facts.push(`The food is at column ${game.food.x}, row ${game.food.y}.`);
   if (context.direction) facts.push(`Food direction from the head: ${foodDirection(head, game.food)}.`);
+  if (context.path) facts.push(pathText(game.shortestPath()));
   if (context.score) facts.push(`Score: ${game.score} (food eaten so far).`);
   return facts.join(' ');
 }

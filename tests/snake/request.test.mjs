@@ -87,18 +87,34 @@ test('each fact appears only when chosen', () => {
     contextText(game, EVERYTHING),
     'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom). ' +
       'The head is at column 9, row 0. The food is at column 9, row 1. ' +
-      'Food direction from the head: down. Score: 0 (food eaten so far).',
+      'Food direction from the head: down. Shortest path to the food (1 move): down. ' +
+      'Score: 0 (food eaten so far).',
   );
   assert.equal(
     contextText(game, { ...NOTHING, head: true }),
     'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom). The head is at column 9, row 0.',
   );
   assert.equal(contextText(game, { ...NOTHING, direction: true }), 'Food direction from the head: down.');
+  assert.equal(
+    contextText(game, { ...NOTHING, path: true }),
+    'Shortest path to the food (1 move): down.',
+  );
+  game.food = { x: 6, y: 1 };
+  assert.equal(
+    contextText(game, { ...NOTHING, path: true }),
+    'Shortest path to the food (4 moves): down, left, left, left.',
+  );
   assert.equal(contextText(game, { ...NOTHING, cells: true }), '');
   assert.equal(
     contextText(game, { ...NOTHING, position: true }),
     'Columns go from 0 (left) to 9 (right) and rows from 0 (top) to 9 (bottom).',
   );
+});
+
+test('the path fact says when no path exists', () => {
+  const game = new SnakeGame(1);
+  game.shortestPath = () => null;
+  assert.equal(contextText(game, { ...NOTHING, path: true }), 'No path to the food.');
 });
 
 test('the safety net keeps only safe options, without it all but back', () => {

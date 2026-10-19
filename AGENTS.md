@@ -98,7 +98,7 @@ read from the logits of the option letters.
 - `examples/snake/`: screenshot Snake demo (dependency-free)
   - `server.py`: standard-library static server on `127.0.0.1:8081`
   - `js/`: ES modules: `game.js` (seeded rules, next cells, safe moves,
-    per-move facts), `request.js` (request from the context items and
+    shortest path, per-move facts), `request.js` (request from the context items and
     option facts chosen in the UI, answer parsing), `controller.js` (fixed
     clock, one request in flight, one answer waiting), `metrics.js`,
     `render.js`, `app.js` (UI), `theme.js` (saved light/dark preference)
